@@ -88,5 +88,15 @@ def ensure_models(base_dir="."):
         min_size=10 * 1024 * 1024
     )
 
+    # 6. 预先下载 NLTK 英文音素转换与词性标注数据包 (防止 g2p_en 运行时触发 LookupError)
+    import nltk
+    print("📦 检查并下载 NLTK 基础数据包...")
+    for pkg in ["averaged_perceptron_tagger", "averaged_perceptron_tagger_eng", "cmudict", "punkt", "punkt_tab"]:
+        try:
+            nltk.download(pkg, quiet=True)
+        except Exception:
+            pass
+    print("✅ NLTK 数据包就绪！")
+
 if __name__ == "__main__":
     ensure_models(".")

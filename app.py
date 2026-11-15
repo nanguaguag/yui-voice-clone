@@ -130,7 +130,11 @@ print("=" * 65)
 # 4. 文本清洗与语言映射中间件
 # K-ON! 轻音少女专属专有名词读音校准表 (防止 OpenJTalk/MeCab 通用词典误读)
 K_ON_SPECIAL_WORDS = {
-    r"ギー太": "ギータ",       # 平泽唯的爱琴 Gibson Les Paul (Giita)，防止 OpenJTalk 误读为 "gii-futoshi"
+    r"ギー太": "ギータ",       # 平泽唯爱琴 Gibson Les Paul (Giita)
+    r"軽音部": "けいおんぶ",   # 解决 OpenJTalk 误将音部切为地名(otobe)读作"kee-otobe"的问题
+    r"軽音": "けいおん",       # けいおん (Keion)
+    r"[Kk][Oo][Nn]部": "けいおんぶ",
+    r"[Kk]-[Oo][Nn]部": "けいおんぶ",
     r"律ちゃん": "りっちゃん",   # 田井中律
     r"澪ちゃん": "みおちゃん",   # 秋山澪
     r"紬ちゃん": "むぎちゃん",   # 琴吹紬
