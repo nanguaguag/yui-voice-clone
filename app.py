@@ -21,12 +21,24 @@ from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 import gradio as gr
 
+try:
+    import spaces
+except ImportError:
+    class spaces:
+        @staticmethod
+        def GPU(func=None, **kwargs):
+            if func is not None:
+                return func
+            def decorator(f):
+                return f
+            return decorator
+
 # 1. 基础路径与环境变量配置
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ["version"] = "v2Pro"
-os.environ["device"] = "cpu"
+if "device" not in os.environ:
+    os.environ["device"] = "cpu"
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 SOVITS_ROOT = os.path.join(APP_DIR, "GPT-SoVITS")
 if os.path.exists(SOVITS_ROOT):
@@ -114,6 +126,7 @@ LANGUAGE_MAP = {
     "多语种混合 (Multilingual)": "Multilingual Mixed",
 }
 
+@spaces.GPU(duration=60)
 def generate_yui_speech(
     text: str,
     prompt_key: str = "prompt_energetic",
