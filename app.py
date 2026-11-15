@@ -127,6 +127,8 @@ infer.change_gpt_weights(DEFAULT_GPT)
 print(f"🎉 唯酱神经网络加载完毕！耗时: {time.time() - t0:.2f}s")
 print("=" * 65)
 
+import scipy.signal as signal
+
 # 4. 文本清洗与语言映射中间件
 # K-ON! 轻音少女专属专有名词读音校准表 (防止 OpenJTalk/MeCab 通用词典误读)
 K_ON_SPECIAL_WORDS = {
@@ -135,6 +137,9 @@ K_ON_SPECIAL_WORDS = {
     r"軽音": "けいおん",       # けいおん (Keion)
     r"[Kk][Oo][Nn]部": "けいおんぶ",
     r"[Kk]-[Oo][Nn]部": "けいおんぶ",
+    r"平沢憂": "ひらさわうい",   # 平泽忧
+    r"憂ちゃん": "ういちゃん",   # 忧酱
+    r"憂": "うい",             # 解决 OpenJTalk 将单字人名"憂"按音读/训读误读为"yuu"或吞音为"u"的问题
     r"律ちゃん": "りっちゃん",   # 田井中律
     r"澪ちゃん": "みおちゃん",   # 秋山澪
     r"紬ちゃん": "むぎちゃん",   # 琴吹紬
@@ -146,11 +151,35 @@ def clean_and_normalize_text(text: str) -> str:
     text = text.strip()
     for word, target in K_ON_SPECIAL_WORDS.items():
         text = re.sub(word, target, text)
+    # 合并连续重复或复合标点，防止 GPT 自回归在同一个分词步遇到重复 pause token 导致死循环
+    text = re.sub(r"[？?]{2,}", "？", text)
+    text = re.sub(r"[！!]{2,}", "！", text)
     text = re.sub(r"[！？?!]{2,}", "！", text)
     text = re.sub(r"[。\.]{2,}", "。", text)
     text = re.sub(r"[，,、]{2,}", "，", text)
     text = re.sub(r"[~〜]{2,}", "〜", text)
     return text
+
+def enhance_voice_clarity(audio: np.ndarray, sr: int = 32000) -> np.ndarray:
+    """消除神经声码器高频机械电音与静音段微弱底噪，让唯酱声音更温润自然"""
+    if len(audio) == 0:
+        return audio
+    # 1. 2阶温和 Butterworth 低通滤波器 (11.5kHz 滚降)，平滑声码器周期性金属高频伪影
+    nyq = 0.5 * sr
+    cutoff = min(11500, nyq - 500)
+    b, a = signal.butter(2, cutoff / nyq, btype='low')
+    smoothed = signal.filtfilt(b, a, audio)
+
+    # 2. 静音段软噪声门 (Noise Gating)，抑制字句间隔和尾部的微弱电流底噪
+    window_size = int(sr * 0.02)
+    envelope = np.abs(smoothed)
+    if len(envelope) > window_size:
+        env_smooth = np.convolve(envelope, np.ones(window_size) / window_size, mode='same')
+        threshold = max(float(np.max(env_smooth)) * 0.008, 1e-4)
+        gate = np.clip((env_smooth - threshold * 0.5) / (threshold * 0.5 + 1e-6), 0.0, 1.0)
+        smoothed = smoothed * gate
+
+    return smoothed.astype(np.float32)
 
 LANGUAGE_MAP = {
     "ja": "Japanese",
@@ -211,12 +240,15 @@ def generate_yui_speech(
     sr, audio_data = next(gen)
     infer_cost = time.time() - t_start
 
-    # 3. 严格音频转换与峰值规整化到 [-0.95, 0.95] float32
+    # 3. 严格音频转换、高频去电音降噪与峰值规整化到 [-0.95, 0.95] float32
     if isinstance(audio_data, np.ndarray) and len(audio_data) > 0:
         if audio_data.dtype == np.int16:
             audio_data = audio_data.astype(np.float32) / 32767.0
         elif audio_data.dtype != np.float32:
             audio_data = audio_data.astype(np.float32)
+
+        # 消除声码器微弱高频机械电音与间歇底噪
+        audio_data = enhance_voice_clarity(audio_data, sr)
 
         max_val = np.abs(audio_data).max()
         if max_val > 1e-4:
