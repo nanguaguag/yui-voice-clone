@@ -65,7 +65,20 @@ def ensure_models(base_dir="."):
         )
         print("✅ 语种识别模型就绪！")
 
-    # 4. 检查唯酱微调模型权重 (从 GitHub Release v1.0.0 下载)
+    # 4. 检查声纹识别特征底模 sv/pretrained_eres2netv2w24s4ep4.ckpt
+    sv_path = os.path.join(models_dir, "sv/pretrained_eres2netv2w24s4ep4.ckpt")
+    if not os.path.exists(sv_path):
+        os.makedirs(os.path.dirname(sv_path), exist_ok=True)
+        print("📦 正在下载声纹特征底模 (pretrained_eres2netv2w24s4ep4.ckpt)...")
+        hf_hub_download(
+            repo_id="lj1995/GPT-SoVITS",
+            filename="sv/pretrained_eres2netv2w24s4ep4.ckpt",
+            local_dir=models_dir,
+            local_dir_use_symlinks=False
+        )
+        print("✅ 声纹特征模型就绪！")
+
+    # 5. 检查唯酱微调模型权重 (从 GitHub Release v1.0.0 下载)
     gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui-e15.ckpt")
     sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_e12_s840.pth")
 
