@@ -55,14 +55,9 @@ def ensure_models(base_dir="."):
     lang_dir = os.path.join(models_dir, "fast_langdetect")
     os.makedirs(lang_dir, exist_ok=True)
     bin_path = os.path.join(lang_dir, "lid.176.bin")
-    if not os.path.exists(bin_path):
+    if not os.path.exists(bin_path) or os.path.getsize(bin_path) < 1000:
         print("📦 正在下载语种识别分类底模 (lid.176.bin)...")
-        hf_hub_download(
-            repo_id="facebook/fasttext-language-identification",
-            filename="lid.176.bin",
-            local_dir=lang_dir,
-            local_dir_use_symlinks=False
-        )
+        download_file("https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin", bin_path, min_size=1000)
         print("✅ 语种识别模型就绪！")
 
     # 4. 检查声纹识别特征底模 sv/pretrained_eres2netv2w24s4ep4.ckpt

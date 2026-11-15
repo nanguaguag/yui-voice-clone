@@ -39,11 +39,8 @@ DEFAULT_GPT = os.path.join(WEIGHTS_DIR, "GPT_weights_v2Pro/yui-e15.ckpt")
 DEFAULT_SOVITS = os.path.join(WEIGHTS_DIR, "SoVITS_weights_v2Pro/yui_e12_s840.pth")
 
 # 确保预训练底模与权重存在
-try:
-    from download_models import ensure_models
-    ensure_models(APP_DIR)
-except Exception as e:
-    print(f"⚠️ 预训练模型校验提示: {e}")
+from download_models import ensure_models
+ensure_models(APP_DIR)
 
 os.environ["gpt_path"] = DEFAULT_GPT
 os.environ["sovits_path"] = DEFAULT_SOVITS
