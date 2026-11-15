@@ -171,13 +171,7 @@ def generate_yui_speech(
 
     return sr, audio_data, infer_cost
 
-# 5. FastAPI 极速应用定义
-app = FastAPI(
-    title="平泽唯 (Hirasawa Yui) TTS REST API",
-    description="《轻音少女》平泽唯专属声音克隆与推理服务，提供毫秒级高并发接口",
-    version="2.0.0"
-)
-
+# 5. RESTful API 请求结构体定义
 class TTSRequest(BaseModel):
     text: str
     prompt: str = "energetic"  # energetic, lazy, excited
@@ -186,58 +180,6 @@ class TTSRequest(BaseModel):
     top_k: int = 15
     top_p: float = 0.8
     temperature: float = 0.8
-
-@app.get("/health")
-def health():
-    return {"status": "ok", "character": "Hirasawa Yui", "model": "GPT-SoVITS v2Pro"}
-
-@app.get("/api/prompts")
-def get_prompts():
-    return {"prompts": prompts_cfg}
-
-@app.get("/api/tts")
-def api_tts_get(
-    text: str = Query(..., description="待合成文本内容"),
-    prompt: str = Query("energetic", description="语气 (energetic/lazy/excited)"),
-    lang: str = Query("auto", description="语言 (ja/zh/en/auto)"),
-    speed: float = Query(1.0, description="语速 (0.6 ~ 1.5)")
-):
-    p_id = f"prompt_{prompt}" if not prompt.startswith("prompt_") else prompt
-    if p_id not in prompts_map:
-        p_id = "prompt_energetic"
-    sr, audio_data, cost = generate_yui_speech(text=text, prompt_key=p_id, language=lang, speed=speed)
-    
-    buf = io.BytesIO()
-    sf.write(buf, audio_data, sr, format="WAV")
-    buf.seek(0)
-    return Response(
-        content=buf.read(),
-        media_type="audio/wav",
-        headers={"X-Infer-Cost": f"{cost:.3f}s", "X-Audio-Sample-Rate": str(sr)}
-    )
-
-@app.post("/api/tts")
-def api_tts_post(req: TTSRequest):
-    p_id = f"prompt_{req.prompt}" if not req.prompt.startswith("prompt_") else req.prompt
-    if p_id not in prompts_map:
-        p_id = "prompt_energetic"
-    sr, audio_data, cost = generate_yui_speech(
-        text=req.text,
-        prompt_key=p_id,
-        language=req.lang,
-        speed=req.speed,
-        top_k=req.top_k,
-        top_p=req.top_p,
-        temperature=req.temperature
-    )
-    buf = io.BytesIO()
-    sf.write(buf, audio_data, sr, format="WAV")
-    buf.seek(0)
-    return Response(
-        content=buf.read(),
-        media_type="audio/wav",
-        headers={"X-Infer-Cost": f"{cost:.3f}s", "X-Audio-Sample-Rate": str(sr)}
-    )
 
 # 6. Gradio 可爱风前端页面设计
 CUSTOM_CSS = """
@@ -440,9 +382,65 @@ with gr.Blocks(title="平泽唯 (Hirasawa Yui) 专属声音克隆", css=CUSTOM_C
         api_name="predict"
     )
 
-# 挂载 Gradio 到 FastAPI
-app = gr.mount_gradio_app(app, demo, path="/")
+# 7. 在 Gradio 内置的 FastAPI app 上注册极速 RESTful API 路由
+@demo.app.get("/health")
+def health():
+    return {"status": "ok", "character": "Hirasawa Yui", "model": "GPT-SoVITS v2Pro"}
+
+@demo.app.get("/api/prompts")
+def get_prompts():
+    return {"prompts": prompts_cfg}
+
+@demo.app.get("/api/tts")
+def api_tts_get(
+    text: str = Query(..., description="待合成文本内容"),
+    prompt: str = Query("energetic", description="语气 (energetic/lazy/excited)"),
+    lang: str = Query("auto", description="语言 (ja/zh/en/auto)"),
+    speed: float = Query(1.0, description="语速 (0.6 ~ 1.5)")
+):
+    p_id = f"prompt_{prompt}" if not prompt.startswith("prompt_") else prompt
+    if p_id not in prompts_map:
+        p_id = "prompt_energetic"
+    sr, audio_data, cost = generate_yui_speech(text=text, prompt_key=p_id, language=lang, speed=speed)
+    
+    buf = io.BytesIO()
+    sf.write(buf, audio_data, sr, format="WAV")
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="audio/wav",
+        headers={"X-Infer-Cost": f"{cost:.3f}s", "X-Audio-Sample-Rate": str(sr)}
+    )
+
+@demo.app.post("/api/tts")
+def api_tts_post(req: TTSRequest):
+    p_id = f"prompt_{req.prompt}" if not req.prompt.startswith("prompt_") else req.prompt
+    if p_id not in prompts_map:
+        p_id = "prompt_energetic"
+    sr, audio_data, cost = generate_yui_speech(
+        text=req.text,
+        prompt_key=p_id,
+        language=req.lang,
+        speed=req.speed,
+        top_k=req.top_k,
+        top_p=req.top_p,
+        temperature=req.temperature
+    )
+    buf = io.BytesIO()
+    sf.write(buf, audio_data, sr, format="WAV")
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="audio/wav",
+        headers={"X-Infer-Cost": f"{cost:.3f}s", "X-Audio-Sample-Rate": str(sr)}
+    )
+
+# 8. 启动应用 (调用 demo.launch 触发 ZeroGPU 探针并激活 Queue)
+demo.queue(max_size=20)
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        show_api=True
+    )
