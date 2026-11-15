@@ -34,6 +34,25 @@ try:
 except Exception:
     pass
 
+# 解决 Gradio 4.44.1 与 Starlette 0.38+ 在 TemplateResponse 参数签名上的不兼容
+try:
+    import starlette.templating
+    _orig_TemplateResponse = starlette.templating.Jinja2Templates.TemplateResponse
+    def safe_TemplateResponse(self, *args, **kwargs):
+        if args and isinstance(args[0], str):
+            name = args[0]
+            context = args[1] if len(args) > 1 else kwargs.get("context", {})
+            request = context.get("request") if isinstance(context, dict) else kwargs.get("request")
+            rest_args = args[2:]
+            return _orig_TemplateResponse(
+                self, request, name, context, *rest_args,
+                **{k: v for k, v in kwargs.items() if k not in ("request", "name", "context")}
+            )
+        return _orig_TemplateResponse(self, *args, **kwargs)
+    starlette.templating.Jinja2Templates.TemplateResponse = safe_TemplateResponse
+except Exception:
+    pass
+
 # 1. 基础路径与环境变量配置
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ["no_proxy"] = "localhost,127.0.0.1,0.0.0.0"

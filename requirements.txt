@@ -1,7 +1,8 @@
 torch>=2.0.0
 torchaudio>=2.0.0
 gradio==4.44.1
-fastapi>=0.110.0
+starlette<0.38.0
+fastapi>=0.110.0,<0.113.0
 uvicorn>=0.28.0
 soundfile>=0.12.1
 librosa>=0.10.1
