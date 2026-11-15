@@ -196,10 +196,15 @@ def generate_yui_speech(
     sr, audio_data = next(gen)
     infer_cost = time.time() - t_start
 
-    # 3. 音频规整化 (-0.95 ~ 0.95)
+    # 3. 严格音频转换与峰值规整化到 [-0.95, 0.95] float32
     if isinstance(audio_data, np.ndarray) and len(audio_data) > 0:
+        if audio_data.dtype == np.int16:
+            audio_data = audio_data.astype(np.float32) / 32767.0
+        elif audio_data.dtype != np.float32:
+            audio_data = audio_data.astype(np.float32)
+
         max_val = np.abs(audio_data).max()
-        if max_val > 0 and max_val < 1.0:
+        if max_val > 1e-4:
             audio_data = (audio_data / max_val * 0.95).astype(np.float32)
 
     return sr, audio_data, infer_cost
@@ -400,7 +405,7 @@ with gr.Blocks(title="平泽唯 (Hirasawa Yui) 专属声音克隆", css=CUSTOM_C
             total_cost = time.time() - t_before
             dur = len(wav_data) / sr
             msg = f"🎉 合成成功！模型纯推理: {cost:.2f}s | 端到端总耗时: {total_cost:.2f}s | 音频时长: {dur:.2f}s"
-            return (sr, (wav_data * 32767).astype(np.int16)), msg
+            return (sr, wav_data), msg
         except Exception as e:
             return None, f"❌ 合成失败: {str(e)}"
 
@@ -437,7 +442,8 @@ def api_tts_get(
     sr, audio_data, cost = generate_yui_speech(text=text, prompt_key=p_id, language=lang, speed=speed)
     
     buf = io.BytesIO()
-    sf.write(buf, audio_data, sr, format="WAV")
+    wav_int16 = (np.clip(audio_data, -1.0, 1.0) * 32767.0).astype(np.int16)
+    sf.write(buf, wav_int16, sr, format="WAV", subtype="PCM_16")
     buf.seek(0)
     return Response(
         content=buf.read(),
@@ -474,7 +480,8 @@ async def api_tts_post(request: Request):
         temperature=temperature
     )
     buf = io.BytesIO()
-    sf.write(buf, audio_data, sr, format="WAV")
+    wav_int16 = (np.clip(audio_data, -1.0, 1.0) * 32767.0).astype(np.int16)
+    sf.write(buf, wav_int16, sr, format="WAV", subtype="PCM_16")
     buf.seek(0)
     return Response(
         content=buf.read(),
