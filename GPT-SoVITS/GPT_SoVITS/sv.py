@@ -23,10 +23,11 @@ class SV:
 
     def compute_embedding3(self, wav):
         with torch.no_grad():
-            if self.is_half == True:
-                wav = wav.half()
+            wav = wav.float()
             feat = torch.stack(
                 [Kaldi.fbank(wav0.unsqueeze(0), num_mel_bins=80, sample_frequency=16000, dither=0) for wav0 in wav]
             )
+            if self.is_half == True:
+                feat = feat.half()
             sv_emb = self.embedding_model.forward3(feat)
         return sv_emb

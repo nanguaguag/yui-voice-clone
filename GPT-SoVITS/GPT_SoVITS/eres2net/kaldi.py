@@ -521,7 +521,7 @@ def fbank(
     )
 
     # size (m, padded_window_size // 2 + 1)
-    spectrum = torch.fft.rfft(strided_input).abs()
+    spectrum = torch.fft.rfft(strided_input.float()).abs().to(dtype=strided_input.dtype)
     if use_power:
         spectrum = spectrum.pow(2.0)
 
