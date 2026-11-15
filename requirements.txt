@@ -11,6 +11,7 @@ pypinyin>=0.50.0
 pyopenjtalk>=0.3.3
 g2p_en>=2.1.0
 jieba>=0.42.1
+jieba_fast>=0.53
 onnxruntime>=1.16.0
 transformers>=4.40.0
 peft==0.17.1
