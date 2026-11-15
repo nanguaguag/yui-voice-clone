@@ -1,0 +1,4 @@
+ffmpeg
+sox
+libsox-fmt-all
+git-lfs
