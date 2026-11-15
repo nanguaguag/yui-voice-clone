@@ -22,6 +22,18 @@ from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 import gradio as gr
 
+# 解决 Gradio Client 与 Pydantic v2 schema 中 additionalProperties: bool 的解析冲突
+try:
+    import gradio_client.utils as client_utils
+    _orig_json_schema_to_python_type = client_utils._json_schema_to_python_type
+    def safe_json_schema_to_python_type(schema, defs=None):
+        if not isinstance(schema, dict):
+            return "typing.Any"
+        return _orig_json_schema_to_python_type(schema, defs)
+    client_utils._json_schema_to_python_type = safe_json_schema_to_python_type
+except Exception:
+    pass
+
 # 1. 基础路径与环境变量配置
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ["no_proxy"] = "localhost,127.0.0.1,0.0.0.0"
@@ -415,18 +427,32 @@ def api_tts_get(
     )
 
 @demo.app.post("/api/tts")
-def api_tts_post(req: TTSRequest):
-    p_id = f"prompt_{req.prompt}" if not req.prompt.startswith("prompt_") else req.prompt
+async def api_tts_post(request: Request):
+    try:
+        req = await request.json()
+    except Exception:
+        req = {}
+    text = req.get("text", "")
+    if not text:
+        raise HTTPException(status_code=400, detail="Missing required field: text")
+    prompt = req.get("prompt", "energetic")
+    lang = req.get("lang", "auto")
+    speed = float(req.get("speed", 1.0))
+    top_k = int(req.get("top_k", 15))
+    top_p = float(req.get("top_p", 1.0))
+    temperature = float(req.get("temperature", 1.0))
+
+    p_id = f"prompt_{prompt}" if not prompt.startswith("prompt_") else prompt
     if p_id not in prompts_map:
         p_id = "prompt_energetic"
     sr, audio_data, cost = generate_yui_speech(
-        text=req.text,
+        text=text,
         prompt_key=p_id,
-        language=req.lang,
-        speed=req.speed,
-        top_k=req.top_k,
-        top_p=req.top_p,
-        temperature=req.temperature
+        language=lang,
+        speed=speed,
+        top_k=top_k,
+        top_p=top_p,
+        temperature=temperature
     )
     buf = io.BytesIO()
     sf.write(buf, audio_data, sr, format="WAV")
