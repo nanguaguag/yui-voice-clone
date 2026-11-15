@@ -24,6 +24,8 @@ import gradio as gr
 
 # 1. 基础路径与环境变量配置
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
+os.environ["no_proxy"] = "localhost,127.0.0.1,0.0.0.0"
+os.environ["NO_PROXY"] = "localhost,127.0.0.1,0.0.0.0"
 os.environ["version"] = "v2Pro"
 if "device" not in os.environ:
     os.environ["device"] = "cpu"
@@ -442,5 +444,6 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=7860,
-        show_api=True
+        show_api=True,
+        share=False
     )
