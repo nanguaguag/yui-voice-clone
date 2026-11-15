@@ -128,9 +128,20 @@ print(f"🎉 唯酱神经网络加载完毕！耗时: {time.time() - t0:.2f}s")
 print("=" * 65)
 
 # 4. 文本清洗与语言映射中间件
+# K-ON! 轻音少女专属专有名词读音校准表 (防止 OpenJTalk/MeCab 通用词典误读)
+K_ON_SPECIAL_WORDS = {
+    r"ギー太": "ギータ",       # 平泽唯的爱琴 Gibson Les Paul (Giita)，防止 OpenJTalk 误读为 "gii-futoshi"
+    r"律ちゃん": "りっちゃん",   # 田井中律
+    r"澪ちゃん": "みおちゃん",   # 秋山澪
+    r"紬ちゃん": "むぎちゃん",   # 琴吹紬
+    r"梓ちゃん": "あずさちゃん", # 中野梓
+}
+
 def clean_and_normalize_text(text: str) -> str:
-    """消除复合问叹号防自回归死循环，规范化省略号与波浪号"""
+    """消除复合问叹号防自回归死循环，校准专有名词读音，规范化省略号与波浪号"""
     text = text.strip()
+    for word, target in K_ON_SPECIAL_WORDS.items():
+        text = re.sub(word, target, text)
     text = re.sub(r"[！？?!]{2,}", "！", text)
     text = re.sub(r"[。\.]{2,}", "。", text)
     text = re.sub(r"[，,、]{2,}", "，", text)
@@ -148,7 +159,7 @@ LANGUAGE_MAP = {
     "多语种混合 (Multilingual)": "Multilingual Mixed",
 }
 
-@spaces.GPU(duration=20)
+@spaces.GPU(duration=60)
 def generate_yui_speech(
     text: str,
     prompt_key: str = "prompt_energetic",
