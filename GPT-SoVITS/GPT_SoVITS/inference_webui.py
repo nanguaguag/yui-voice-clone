@@ -424,7 +424,11 @@ def change_gpt_weights(gpt_path):
         f.write(json.dumps(data))
 
 
-change_gpt_weights(gpt_path)
+try:
+    if gpt_path and os.path.exists(gpt_path):
+        change_gpt_weights(gpt_path)
+except Exception as e:
+    print(f"⚠️ Initial change_gpt_weights skipped: {e}")
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import torch
 

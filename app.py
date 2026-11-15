@@ -34,6 +34,10 @@ if os.path.exists(SOVITS_ROOT):
     sys.path.insert(0, os.path.join(SOVITS_ROOT, "GPT_SoVITS"))
     os.chdir(SOVITS_ROOT)
 
+WEIGHTS_DIR = os.path.join(APP_DIR, "weights")
+DEFAULT_GPT = os.path.join(WEIGHTS_DIR, "GPT_weights_v2Pro/yui-e15.ckpt")
+DEFAULT_SOVITS = os.path.join(WEIGHTS_DIR, "SoVITS_weights_v2Pro/yui_e12_s840.pth")
+
 # 确保预训练底模与权重存在
 try:
     from download_models import ensure_models
@@ -41,12 +45,12 @@ try:
 except Exception as e:
     print(f"⚠️ 预训练模型校验提示: {e}")
 
+os.environ["gpt_path"] = DEFAULT_GPT
+os.environ["sovits_path"] = DEFAULT_SOVITS
+
 import inference_webui as infer
 
-# 2. 模型权重与参考切片定义
-WEIGHTS_DIR = os.path.join(APP_DIR, "weights")
-DEFAULT_GPT = os.path.join(WEIGHTS_DIR, "GPT_weights_v2Pro/yui-e15.ckpt")
-DEFAULT_SOVITS = os.path.join(WEIGHTS_DIR, "SoVITS_weights_v2Pro/yui_e12_s840.pth")
+# 2. 参考切片与提示词配置
 
 PROMPTS_FILE = os.path.join(APP_DIR, "data/tts/yui_character_prompts.json")
 if os.path.exists(PROMPTS_FILE):

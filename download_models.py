@@ -4,7 +4,23 @@
 """
 import os
 import sys
-import subprocess
+import urllib.request
+
+def download_file(url, target_path, min_size=1024):
+    if os.path.exists(target_path) and os.path.getsize(target_path) >= min_size:
+        return
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    print(f"📦 正在下载: {os.path.basename(target_path)} ...")
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; YuiVoiceClone/1.0)"}
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=300) as response, open(target_path, "wb") as out_file:
+        chunk_size = 1024 * 1024
+        while True:
+            chunk = response.read(chunk_size)
+            if not chunk:
+                break
+            out_file.write(chunk)
+    print(f"✅ 下载完成: {os.path.basename(target_path)} ({os.path.getsize(target_path)/(1024*1024):.2f} MB)")
 
 def ensure_models(base_dir="."):
     models_dir = os.path.join(base_dir, "GPT-SoVITS/GPT_SoVITS/pretrained_models")
@@ -13,7 +29,7 @@ def ensure_models(base_dir="."):
     hubert_dir = os.path.join(models_dir, "chinese-hubert-base")
     bert_dir = os.path.join(models_dir, "chinese-roberta-wwm-ext-large")
     
-    from huggingface_hub import snapshot_download
+    from huggingface_hub import snapshot_download, hf_hub_download
     
     # 1. 检查并下载 HuBERT
     if not os.path.exists(hubert_dir) or not os.path.exists(os.path.join(hubert_dir, "pytorch_model.bin")):
@@ -40,7 +56,6 @@ def ensure_models(base_dir="."):
     os.makedirs(lang_dir, exist_ok=True)
     bin_path = os.path.join(lang_dir, "lid.176.bin")
     if not os.path.exists(bin_path):
-        from huggingface_hub import hf_hub_download
         print("📦 正在下载语种识别分类底模 (lid.176.bin)...")
         hf_hub_download(
             repo_id="facebook/fasttext-language-identification",
@@ -50,21 +65,20 @@ def ensure_models(base_dir="."):
         )
         print("✅ 语种识别模型就绪！")
 
-    # 4. 检查唯酱微调模型权重
+    # 4. 检查唯酱微调模型权重 (从 GitHub Release v1.0.0 下载)
     gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui-e15.ckpt")
     sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_e12_s840.pth")
 
-    if not os.path.exists(gpt_weight) or os.path.getsize(gpt_weight) < 1000:
-        os.makedirs(os.path.dirname(gpt_weight), exist_ok=True)
-        print("📦 正在拉取平泽唯 GPT 微调权重 (yui-e15.ckpt)...")
-        url = "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui-e15.ckpt"
-        subprocess.run(["curl", "-L", "-o", gpt_weight, url], check=False)
-
-    if not os.path.exists(sovits_weight) or os.path.getsize(sovits_weight) < 1000:
-        os.makedirs(os.path.dirname(sovits_weight), exist_ok=True)
-        print("📦 正在拉取平泽唯 SoVITS 声学微调权重 (yui_e12_s840.pth)...")
-        url = "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui_e12_s840.pth"
-        subprocess.run(["curl", "-L", "-o", sovits_weight, url], check=False)
+    download_file(
+        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui-e15.ckpt",
+        gpt_weight,
+        min_size=10 * 1024 * 1024
+    )
+    download_file(
+        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui_e12_s840.pth",
+        sovits_weight,
+        min_size=10 * 1024 * 1024
+    )
 
 if __name__ == "__main__":
     ensure_models(".")
