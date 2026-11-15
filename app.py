@@ -6,6 +6,7 @@
 - 暴露标准 Gradio 接口与 RESTful FastAPI 接口 (/api/tts)
 """
 
+import spaces
 import os
 import sys
 import re
@@ -20,18 +21,6 @@ from fastapi import FastAPI, Request, Query, HTTPException
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 import gradio as gr
-
-try:
-    import spaces
-except ImportError:
-    class spaces:
-        @staticmethod
-        def GPU(func=None, **kwargs):
-            if func is not None:
-                return func
-            def decorator(f):
-                return f
-            return decorator
 
 # 1. 基础路径与环境变量配置
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
