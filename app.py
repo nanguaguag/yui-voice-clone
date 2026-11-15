@@ -148,7 +148,7 @@ LANGUAGE_MAP = {
     "多语种混合 (Multilingual)": "Multilingual Mixed",
 }
 
-@spaces.GPU(duration=60)
+@spaces.GPU(duration=20)
 def generate_yui_speech(
     text: str,
     prompt_key: str = "prompt_energetic",
