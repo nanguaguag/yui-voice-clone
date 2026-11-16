@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 """
-自动检查并下载 GPT-SoVITS 必需的离线预训练底模与平泽唯专属权重
+自动检查并下载 GPT-SoVITS 必需的离线预训练底模与放学后茶会全员专属权重
 """
 import os
 import sys
 import urllib.request
+
+CHARACTER_WEIGHT_FILENAMES = {
+    "yui": ("yui_pure_v2_e10_s230.pth", "yui_pure_v2-e15.ckpt"),
+    "mio": ("mio_pure_v2_e10_s220.pth", "mio_pure_v2-e15.ckpt"),
+    "ritsu": ("ritsu_pure_v2_e10_s210.pth", "ritsu_pure_v2-e15.ckpt"),
+    "tsumugi": ("tsumugi_pure_v2_e10_s240.pth", "tsumugi_pure_v2-e15.ckpt"),
+    "azusa": ("azusa_pure_v2_e10_s220.pth", "azusa_pure_v2-e15.ckpt"),
+    "ui": ("ui_pure_v2_e10_s170.pth", "ui_pure_v2-e15.ckpt"),
+    "nodoka": ("nodoka_pure_v2_e10_s160.pth", "nodoka_pure_v2-e15.ckpt"),
+}
 
 def download_file(url, target_path, min_size=1024):
     if os.path.exists(target_path) and os.path.getsize(target_path) >= min_size:
@@ -86,42 +96,48 @@ def ensure_models(base_dir="."):
         )
         print("✅ 声纹特征模型就绪！")
 
-    # 5. 检查唯酱微调模型权重 (从 GitHub Release 下载)
+    # 5. 确保默认平泽唯微调模型权重就绪
     gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui_pure_v2-e15.ckpt")
     sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_pure_v2_e10_s230.pth")
 
-    # 优先下载并使用 v2.0.0 纯净干音微调权重
-    try:
-        download_file(
-            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2-e15.ckpt",
-            gpt_weight,
-            min_size=10 * 1024 * 1024
-        )
-    except Exception as e:
-        print(f"⚠️ 下载 v2.0.0 GPT 权重失败: {e}，尝试回退 v1.0.0...")
-        gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui-e15.ckpt")
-        download_file(
-            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui-e15.ckpt",
-            gpt_weight,
-            min_size=10 * 1024 * 1024
-        )
+    # 若本地已有 PSSD 目录则优先复用
+    local_p1_s = "/Volumes/My PSSD/projects/FLUX3/weights/yui_pure_v2/SoVITS_weights_v2Pro/yui_pure_v2_e10_s230.pth"
+    local_p1_g = "/Volumes/My PSSD/projects/FLUX3/weights/yui_pure_v2/GPT_weights_v2Pro/yui_pure_v2-e15.ckpt"
+    if os.path.exists(local_p1_s) and os.path.exists(local_p1_g):
+        sovits_weight = local_p1_s
+        gpt_weight = local_p1_g
+    else:
+        try:
+            download_file(
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2-e15.ckpt",
+                gpt_weight,
+                min_size=10 * 1024 * 1024
+            )
+        except Exception as e:
+            print(f"⚠️ 下载 v2.0.0 GPT 权重失败: {e}，尝试回退 v1.0.0...")
+            gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui-e15.ckpt")
+            download_file(
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui-e15.ckpt",
+                gpt_weight,
+                min_size=10 * 1024 * 1024
+            )
 
-    try:
-        download_file(
-            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2_e10_s230.pth",
-            sovits_weight,
-            min_size=10 * 1024 * 1024
-        )
-    except Exception as e:
-        print(f"⚠️ 下载 v2.0.0 SoVITS 权重失败: {e}，尝试回退 v1.0.0...")
-        sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_e12_s840.pth")
-        download_file(
-            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui_e12_s840.pth",
-            sovits_weight,
-            min_size=10 * 1024 * 1024
-        )
+        try:
+            download_file(
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2_e10_s230.pth",
+                sovits_weight,
+                min_size=10 * 1024 * 1024
+            )
+        except Exception as e:
+            print(f"⚠️ 下载 v2.0.0 SoVITS 权重失败: {e}，尝试回退 v1.0.0...")
+            sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_e12_s840.pth")
+            download_file(
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui_e12_s840.pth",
+                sovits_weight,
+                min_size=10 * 1024 * 1024
+            )
 
-    # 6. 预先下载 NLTK 英文音素转换与词性标注数据包 (防止 g2p_en 运行时触发 LookupError)
+    # 6. 预先下载 NLTK 英文音素转换与词性标注数据包
     import nltk
     print("📦 检查并下载 NLTK 基础数据包...")
     for pkg in ["averaged_perceptron_tagger", "averaged_perceptron_tagger_eng", "cmudict", "punkt", "punkt_tab"]:
@@ -132,6 +148,50 @@ def ensure_models(base_dir="."):
     print("✅ NLTK 数据包就绪！")
 
     return gpt_weight, sovits_weight
+
+def ensure_character_weights(char_id: str, base_dir="."):
+    """获取指定角色的 SoVITS 和 GPT 权重路径 (优先本地 -> 次选容器 weights -> 云端动态拉取)"""
+    char_id = char_id.lower()
+    if char_id not in CHARACTER_WEIGHT_FILENAMES:
+        char_id = "yui"
+    
+    s_name, g_name = CHARACTER_WEIGHT_FILENAMES[char_id]
+    
+    # 候选 1: 本地移动硬盘 projects 根目录
+    local_p1_s = f"/Volumes/My PSSD/projects/FLUX3/weights/{char_id}_pure_v2/SoVITS_weights_v2Pro/{s_name}"
+    local_p1_g = f"/Volumes/My PSSD/projects/FLUX3/weights/{char_id}_pure_v2/GPT_weights_v2Pro/{g_name}"
+    if os.path.exists(local_p1_s) and os.path.exists(local_p1_g):
+        return local_p1_s, local_p1_g
+
+    # 候选 2: 容器/工作区内的 weights 目录
+    target_s = os.path.join(base_dir, f"weights/{char_id}_pure_v2/SoVITS_weights_v2Pro/{s_name}")
+    target_g = os.path.join(base_dir, f"weights/{char_id}_pure_v2/GPT_weights_v2Pro/{g_name}")
+    if os.path.exists(target_s) and os.path.exists(target_g):
+        return target_s, target_g
+
+    # 候选 3: 若本地或已下载有默认 yui
+    if char_id == "yui":
+        p_g = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui_pure_v2-e15.ckpt")
+        p_s = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_pure_v2_e10_s230.pth")
+        if os.path.exists(p_s) and os.path.exists(p_g):
+            return p_s, p_g
+
+    # 尝试从 GitHub Release 下载
+    try:
+        download_file(
+            f"https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/{s_name}",
+            target_s,
+            min_size=10 * 1024 * 1024
+        )
+        download_file(
+            f"https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/{g_name}",
+            target_g,
+            min_size=10 * 1024 * 1024
+        )
+        return target_s, target_g
+    except Exception as e:
+        print(f"⚠️ 下载 {char_id} 权重异常: {e}，回退使用平泽唯模型")
+        return ensure_character_weights("yui", base_dir)
 
 if __name__ == "__main__":
     ensure_models(".")
