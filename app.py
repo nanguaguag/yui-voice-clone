@@ -554,6 +554,15 @@ async def api_tts_post(request: Request):
         headers={"X-Infer-Cost": f"{cost:.3f}s", "X-Audio-Sample-Rate": str(sr), "X-Character": character}
     )
 
+# 确保 demo.app 上的自定义 FastAPI 路由随 demo.launch() 自动挂载
+from gradio.routes import App as GradioApp
+_orig_create_app = GradioApp.create_app
+def _custom_create_app(*args, **kwargs):
+    app = _orig_create_app(*args, **kwargs)
+    app.include_router(demo.app.router)
+    return app
+GradioApp.create_app = _custom_create_app
+
 demo.queue(max_size=20)
 
 if __name__ == "__main__":
