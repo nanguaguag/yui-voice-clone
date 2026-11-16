@@ -10,16 +10,29 @@ def download_file(url, target_path, min_size=1024):
     if os.path.exists(target_path) and os.path.getsize(target_path) >= min_size:
         return
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    temp_target = target_path + ".tmp"
     print(f"📦 正在下载: {os.path.basename(target_path)} ...")
     headers = {"User-Agent": "Mozilla/5.0 (compatible; YuiVoiceClone/1.0)"}
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=300) as response, open(target_path, "wb") as out_file:
-        chunk_size = 1024 * 1024
-        while True:
-            chunk = response.read(chunk_size)
-            if not chunk:
-                break
-            out_file.write(chunk)
+    try:
+        with urllib.request.urlopen(req, timeout=300) as response, open(temp_target, "wb") as out_file:
+            chunk_size = 1024 * 1024
+            while True:
+                chunk = response.read(chunk_size)
+                if not chunk:
+                    break
+                out_file.write(chunk)
+        actual_size = os.path.getsize(temp_target)
+        if actual_size < min_size:
+            raise ValueError(f"下载文件大小异常 ({actual_size} 字节 < {min_size} 字节)")
+        os.replace(temp_target, target_path)
+    except Exception as e:
+        if os.path.exists(temp_target):
+            try:
+                os.remove(temp_target)
+            except Exception:
+                pass
+        raise e
     print(f"✅ 下载完成: {os.path.basename(target_path)} ({os.path.getsize(target_path)/(1024*1024):.2f} MB)")
 
 def ensure_models(base_dir="."):
@@ -77,17 +90,36 @@ def ensure_models(base_dir="."):
     gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui_pure_v2-e15.ckpt")
     sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_pure_v2_e10_s230.pth")
 
-    # 优先下载 v2.0.0 纯净干音微调权重
-    download_file(
-        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2-e15.ckpt",
-        gpt_weight,
-        min_size=10 * 1024 * 1024
-    )
-    download_file(
-        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2_e10_s230.pth",
-        sovits_weight,
-        min_size=10 * 1024 * 1024
-    )
+    # 优先下载并使用 v2.0.0 纯净干音微调权重
+    try:
+        download_file(
+            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2-e15.ckpt",
+            gpt_weight,
+            min_size=10 * 1024 * 1024
+        )
+    except Exception as e:
+        print(f"⚠️ 下载 v2.0.0 GPT 权重失败: {e}，尝试回退 v1.0.0...")
+        gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui-e15.ckpt")
+        download_file(
+            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui-e15.ckpt",
+            gpt_weight,
+            min_size=10 * 1024 * 1024
+        )
+
+    try:
+        download_file(
+            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2_e10_s230.pth",
+            sovits_weight,
+            min_size=10 * 1024 * 1024
+        )
+    except Exception as e:
+        print(f"⚠️ 下载 v2.0.0 SoVITS 权重失败: {e}，尝试回退 v1.0.0...")
+        sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_e12_s840.pth")
+        download_file(
+            "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui_e12_s840.pth",
+            sovits_weight,
+            min_size=10 * 1024 * 1024
+        )
 
     # 6. 预先下载 NLTK 英文音素转换与词性标注数据包 (防止 g2p_en 运行时触发 LookupError)
     import nltk
@@ -98,6 +130,8 @@ def ensure_models(base_dir="."):
         except Exception:
             pass
     print("✅ NLTK 数据包就绪！")
+
+    return gpt_weight, sovits_weight
 
 if __name__ == "__main__":
     ensure_models(".")
