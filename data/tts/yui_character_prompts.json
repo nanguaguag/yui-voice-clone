@@ -4,27 +4,43 @@
   "prompts": [
     {
       "id": "prompt_energetic",
-      "name": "日常元气 / 开朗少女",
-      "audio_path": "data/tts/yui_slices/yui_00002.wav",
-      "prompt_text": "文化系のクラブもよくわかんないし",
+      "name": "元气",
+      "audio_path": "data/tts/yui_slices/yui_00065.wav",
+      "prompt_text": "かっこいい大人の女性って感じです。",
       "prompt_language": "ja",
       "tone_description": "语速轻快，尾音上扬，充满朝气和略带迷糊的高中少女日常感，适合一般对话、日常播报与开心互动。"
     },
     {
+      "id": "prompt_routin",
+      "name": "日常",
+      "audio_path": "data/tts/yui_slices/yui_00087.wav",
+      "prompt_text": "ドラム担当の田井中律ちゃん",
+      "prompt_language": "ja",
+      "tone_description": "语速轻快，标志性天真烂漫、无忧无虑的性格，适合一般对话、日常播报与开心互动。"
+    },
+    {
       "id": "prompt_lazy_cute",
-      "name": "呆萌慵懒 / 地板撒娇",
+      "name": "呆萌/撒娇",
       "audio_path": "data/tts/yui_slices/yui_00035.wav",
       "prompt_text": "夏は床の上を転がってばかりいるの",
       "prompt_language": "ja",
-      "tone_description": "语速稍缓，尾音拉长，带着标志性的软绵绵鼻音与撒娇拖音（夏天热得在地板上打滚），适合撒娇、喊饿、不想写作业或无聊发呆。"
+      "tone_description": "语速稍缓，尾音拉长，带着标志性的软绵绵鼻音与撒娇拖音，适合撒娇、喊饿、不想写作业或无聊发呆。"
     },
     {
       "id": "prompt_excited",
-      "name": "兴奋高亢 / 满血鸡血",
+      "name": "兴奋",
       "audio_path": "data/tts/yui_slices/yui_00136.wav",
       "prompt_text": "軽音部のみんなも協力してくれるんだ!",
       "prompt_language": "ja",
-      "tone_description": "音调拔高，充满热情与眼睛放光的喜悦（决定买吉他！大家都会帮我！），适合庆祝、兴奋呼喊、大声宣告或高能桥段。"
+      "tone_description": "音调拔高，充满热情与眼睛放光的喜悦，适合庆祝、兴奋呼喊、大声宣告或高能桥段。"
+    },
+    {
+      "id": "prompt_surprised",
+      "name": "惊喜",
+      "audio_path": "data/tts/yui_slices/yui_00059.wav",
+      "prompt_text": "今日は麦ちゃん美味しいお菓子持ってきてくれるんだ",
+      "prompt_language": "ja",
+      "tone_description": "音调拔高，充满了期待与喜悦，语调高昂、轻快，展现活泼、天真烂漫的性格。"
     }
   ]
 }

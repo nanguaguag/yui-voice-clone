@@ -73,17 +73,18 @@ def ensure_models(base_dir="."):
         )
         print("✅ 声纹特征模型就绪！")
 
-    # 5. 检查唯酱微调模型权重 (从 GitHub Release v1.0.0 下载)
-    gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui-e15.ckpt")
-    sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_e12_s840.pth")
+    # 5. 检查唯酱微调模型权重 (从 GitHub Release 下载)
+    gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui_pure_v2-e15.ckpt")
+    sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_pure_v2_e10_s230.pth")
 
+    # 优先下载 v2.0.0 纯净干音微调权重
     download_file(
-        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui-e15.ckpt",
+        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2-e15.ckpt",
         gpt_weight,
         min_size=10 * 1024 * 1024
     )
     download_file(
-        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v1.0.0/yui_e12_s840.pth",
+        "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2_e10_s230.pth",
         sovits_weight,
         min_size=10 * 1024 * 1024
     )

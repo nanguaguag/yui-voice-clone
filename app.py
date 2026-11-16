@@ -69,8 +69,13 @@ if os.path.exists(SOVITS_ROOT):
     os.chdir(SOVITS_ROOT)
 
 WEIGHTS_DIR = os.path.join(APP_DIR, "weights")
-DEFAULT_GPT = os.path.join(WEIGHTS_DIR, "GPT_weights_v2Pro/yui-e15.ckpt")
-DEFAULT_SOVITS = os.path.join(WEIGHTS_DIR, "SoVITS_weights_v2Pro/yui_e12_s840.pth")
+DEFAULT_GPT = os.path.join(WEIGHTS_DIR, "GPT_weights_v2Pro/yui_pure_v2-e15.ckpt")
+if not os.path.exists(DEFAULT_GPT):
+    DEFAULT_GPT = os.path.join(WEIGHTS_DIR, "GPT_weights_v2Pro/yui-e15.ckpt")
+
+DEFAULT_SOVITS = os.path.join(WEIGHTS_DIR, "SoVITS_weights_v2Pro/yui_pure_v2_e10_s230.pth")
+if not os.path.exists(DEFAULT_SOVITS):
+    DEFAULT_SOVITS = os.path.join(WEIGHTS_DIR, "SoVITS_weights_v2Pro/yui_e12_s840.pth")
 
 # 确保预训练底模与权重存在
 from download_models import ensure_models
