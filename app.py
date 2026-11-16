@@ -19,6 +19,22 @@ import gradio as gr
 from fastapi import FastAPI, Response, Request, HTTPException, Query
 from pydantic import BaseModel
 
+# 修复 Gradio 4.44.1 在解析 FileData 模式下 additionalProperties 属性为布尔值导致 TypeError 的已知缺陷
+try:
+    import gradio_client.utils as client_utils
+    _orig_json_schema_to_python_type = client_utils._json_schema_to_python_type
+    def _safe_json_schema_to_python_type(schema, defs=None):
+        if isinstance(schema, bool):
+            return "Any"
+        if isinstance(schema, dict) and isinstance(schema.get("additionalProperties"), bool):
+            s = dict(schema)
+            s["additionalProperties"] = {}
+            return _orig_json_schema_to_python_type(s, defs)
+        return _orig_json_schema_to_python_type(schema, defs)
+    client_utils._json_schema_to_python_type = _safe_json_schema_to_python_type
+except Exception:
+    pass
+
 # 0. ZeroGPU 探针适配
 try:
     import spaces
@@ -407,7 +423,8 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
             prompt_radio,
             text_input,
             generate_btn
-        ]
+        ],
+        api_name=False
     )
 
     # --- 点击生成交互回调 ---
