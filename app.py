@@ -353,7 +353,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
         with gr.Column(scale=5):
             # --- 角色选择器 ---
             with gr.Group(elem_classes=["char-selector-box"]):
-                gr.Markdown("### 🎀 1. 点选放学后茶会角色 (选择即切换专属主题配色)")
+                gr.Markdown("### 🎀 1. 点选放学后茶会角色")
                 char_selector = gr.Radio(
                     choices=CHARACTER_CHOICES,
                     value=CHARACTER_CHOICES[0],
@@ -373,7 +373,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
                 interactive=True
             )
 
-            with gr.Accordion("🛠️ 自定义声学参考 (上传专属音频 / 提示词)", open=False):
+            with gr.Accordion("🛠️ 自定义声学参考 (上传角色音频 / 提示词)", open=False):
                 custom_audio = gr.Audio(label="自定义参考音频 (建议 3~8 秒无杂音纯净人声)", type="filepath")
                 custom_text = gr.Textbox(label="参考音频台词 (对应音频中说的话)", placeholder="输入该音频中对应的台词文本...")
                 custom_lang = gr.Dropdown(
@@ -383,7 +383,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
                 )
 
             # --- 待合成文本 ---
-            gr.Markdown("### 💬 3. 待合成文本 (支持中 / 日 / 英 / 混杂)")
+            gr.Markdown("### 💬 3. 待合成文本")
             text_input = gr.Textbox(
                 label="目标台词内容 (多语种混合模式下，用 [JA]唯[/JA] 包裹可触发日文原声专有名词读音)",
                 placeholder="在此输入你想让角色说的话（例：大家好，我是[JA]平沢唯[/JA]！）...",
@@ -392,7 +392,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
             )
 
             # --- 经典台词快速点选 ---
-            with gr.Accordion("🍰 快速点选经典台词 (一键填入目标文本)", open=False):
+            with gr.Accordion("🍰 快速点选经典台词", open=False):
                 with gr.Tab("🇯🇵 日语原声台词"):
                     gr.Examples(
                         examples=[
@@ -473,7 +473,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
             new_prompts = [p["name"] for p in char_info["prompts"]] + ["🎨 自定义参考音频与台词"]
             new_prompt_val = new_prompts[0]
         else:
-            new_prompts = ["🎵 默认纯净台词语气", "🎨 自定义参考音频与台词"]
+            new_prompts = ["🎵 默认", "🎨 自定义参考音频与台词"]
             new_prompt_val = new_prompts[0]
 
         new_btn_label = f"{char_info['avatar']} 让{char_info['short_name']}发声！ (Generate Speech)"

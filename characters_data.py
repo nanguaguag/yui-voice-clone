@@ -106,8 +106,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/mio_00002.wav",
-            "prompt_text": "知事?遅刻だぞ行ってきます",
+            "audio_path": "data/tts/slices/mio_00056.wav",
+            "prompt_text": "お誕生日おめでとうございます。ういちゃん。",
             "prompt_language": "ja",
             "desc": "澪酱标志性沉稳清润的声线，带着微羞涩与认真的日常语调。"
         },
@@ -147,8 +147,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/ritsu_00002.wav",
-            "prompt_text": "7時、8時8時だと！",
+            "audio_path": "data/tts/slices/ritsu_00042.wav",
+            "prompt_text": "びっくりした！誕生日おめでとう！お祝いしようぜ！",
             "prompt_language": "ja",
             "desc": "律队元气满满的大嗓门，豪爽乐观，充满领袖气息与欢快吐槽感。"
         },
@@ -188,8 +188,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/tsumugi_00002.wav",
-            "prompt_text": "8時、8時、8時ですよ",
+            "audio_path": "data/tts/slices/tsumugi_00054.wav",
+            "prompt_text": "今年のクリスマスも、みんなと過ごしたいわー！",
             "prompt_language": "ja",
             "desc": "温柔文雅、轻声细语的大小姐语气，带点对平民生活的新奇与甜美笑意。"
         },
@@ -229,8 +229,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/azusa_00003.wav",
-            "prompt_text": "いってきまーすいってらっしゃーい9時、10時、11時、12時お昼休みごはん",
+            "audio_path": "data/tts/slices/azusa_00033.wav",
+            "prompt_text": "お誕生日ですよね。おめでとうございます。ハッピーバースデー！",
             "prompt_language": "ja",
             "desc": "认真严谨的学妹声线，带着标志性的微傲娇、被前辈抱住时的娇嗔与纯真。"
         },
@@ -270,8 +270,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/ui_00002.wav",
-            "prompt_text": "8時!8時!はっ!",
+            "audio_path": "data/tts/slices/ui_00077.wav",
+            "prompt_text": "えっと、これを選んだ人の今日の運勢は大吉みたいです。",
             "prompt_language": "ja",
             "desc": "极其体贴温柔、像小妈妈一样宠爱姐姐的乖巧甜美声线。"
         },
@@ -311,8 +311,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/nodoka_00001.wav",
-            "prompt_text": "1時、2時、3時、4時、5時、6時、7時、8時、もう8時よ",
+            "audio_path": "data/tts/slices/nodoka_00043.wav",
+            "prompt_text": "福は内！今日はバレンタインデーね。いつものお礼よ。",
             "prompt_language": "ja",
             "desc": "理智沉稳、知性端庄的学生会长声线，说话条理清晰，充满关切。"
         },

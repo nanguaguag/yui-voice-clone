@@ -790,12 +790,11 @@ def get_phones_and_bert(text, language, version, final=False):
     phones = sum(phones_list, [])
     norm_text = "".join(norm_text_list)
 
-    # 音素序列边界不变式守卫：过滤 UNK 并折叠跨语种拼接产生的连续标点音素，保持 bert 维度同步对齐
-    pu_set = {"!", "?", "…", ",", ".", "-", "SP", "SP2", "SP3", "UNK"}
+    # 音素序列边界不变式守卫：折叠跨语种拼接或复合标点产生的连续标点音素，保持 bert 维度同步对齐
+    # 注：保留源自日文重音短语边界 '#' 的 UNK（训练阶段同样存在，不可误删）
+    pu_set = {"!", "?", "…", ",", ".", "-", "SP", "SP2", "SP3"}
     keep_indices = []
     for idx, ph in enumerate(phones):
-        if ph == "UNK":
-            continue
         if ph in pu_set and keep_indices and phones[keep_indices[-1]] in pu_set:
             if phones[keep_indices[-1]] in (",", "-", "…") and ph in ("!", "?", "."):
                 keep_indices[-1] = idx
