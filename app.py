@@ -87,137 +87,111 @@ infer.change_gpt_weights(DEFAULT_GPT)
 print(f"🎉 神经音色引擎就绪！初始加载耗时: {time.time() - t0:.2f}s")
 print("=" * 65)
 
-# 2. K-ON! 专有名词注音映射表与语言感知文本处理中间件
+# 2. 文本清洗与语言映射中间件
+K_ON_SPECIAL_WORDS = [
+    # --- 1. 平泽唯 (Hirasawa Yui) ---
+    (r"平[泽沢澤]唯", "ひらさわゆい"),
+    (r"唯ちゃん", "ゆいちゃん"),
+    (r"唯[酱醤]", "ゆいちゃん"),
+    (r"唯[先前][辈輩]", "ゆいせんぱい"),
+    (r"唯さん", "ゆいさん"),
+    (r"小唯", "ゆいちゃん"),
+    (r"阿唯", "ゆいちゃん"),
+    (r"唯", "ゆい"),
 
-# 全量 K-ON! 角色与专有名词 → 日文假名注音映射（仅在日文模式下启用）
-K_ON_PHONETIC_MAPPING = {
-    # === 平泽唯 (Hirasawa Yui) ===
-    r"平[泽沢澤]唯": "ひらさわゆい",
-    r"唯先輩": "ゆいせんぱい",
-    r"唯[先前]辈": "ゆいせんぱい",
-    r"唯ちゃん": "ゆいちゃん",
-    r"唯[酱醤]": "ゆいちゃん",
-    r"唯さん": "ゆいさん",
-    r"唯": "ゆい",
+    # --- 2. 秋山澪 (Akiyama Mio) ---
+    (r"秋山澪", "あきやまみお"),
+    (r"澪ちゃん", "みおちゃん"),
+    (r"澪[酱醤]", "みおちゃん"),
+    (r"澪[先前][辈輩]", "みおせんぱい"),
+    (r"澪さん", "みおさん"),
+    (r"小澪", "みおちゃん"),
+    (r"澪", "みお"),
 
-    # === 秋山澪 (Akiyama Mio) ===
-    r"秋山澪": "あきやまみお",
-    r"澪先輩": "みおせんぱい",
-    r"澪[先前]辈": "みおせんぱい",
-    r"澪ちゃん": "みおちゃん",
-    r"澪[酱醤]": "みおちゃん",
-    r"澪": "みお",
+    # --- 3. 田井中律 (Tainaka Ritsu) ---
+    (r"田井中律", "たいなかりつ"),
+    (r"律ちゃん", "りっちゃん"),
+    (r"律[酱醤]", "りっちゃん"),
+    (r"律[队隊][长長]", "りつたいちょう"),
+    (r"律[先前][辈輩]", "りつせんぱい"),
+    (r"小律", "りっちゃん"),
+    (r"律", "りつ"),
 
-    # === 田井中律 (Tainaka Ritsu) ===
-    r"田井中律": "たいなかりつ",
-    r"律[队隊][长長]": "りつたいちょう",
-    r"律先輩": "りつせんぱい",
-    r"律[先前]辈": "りつせんぱい",
-    r"律ちゃん": "りっちゃん",
-    r"律[酱醤]": "りっちゃん",
-    r"律っ": "りっ",
-    r"律": "りつ",
+    # --- 4. 琴吹紬 (Kotobuki Tsumugi) ---
+    (r"琴吹紬", "ことぶきつむぎ"),
+    (r"紬ちゃん", "むぎちゃん"),
+    (r"紬[酱醤]", "むぎちゃん"),
+    (r"ムギちゃん", "むぎちゃん"),
+    (r"紬[先前][辈輩]", "むぎせんぱい"),
+    (r"小紬", "むぎちゃん"),
+    (r"紬", "つむぎ"),
 
-    # === 琴吹紬 (Kotobuki Tsumugi) ===
-    r"琴吹紬": "ことぶきつむぎ",
-    r"紬先輩": "むぎせんぱい",
-    r"紬[先前]辈": "むぎせんぱい",
-    r"紬ちゃん": "むぎちゃん",
-    r"紬[酱醤]": "むぎちゃん",
-    r"ムギちゃん": "むぎちゃん",
-    r"紬": "つむぎ",
+    # --- 5. 中野梓 (Nakano Azusa) ---
+    (r"中野梓", "なかのあずさ"),
+    (r"梓ちゃん", "あずさちゃん"),
+    (r"梓[酱醤]", "あずさちゃん"),
+    (r"梓喵", "あずにゃん"),
+    (r"梓ニャン", "あずにゃん"),
+    (r"小梓", "あずさちゃん"),
+    (r"梓", "あずさ"),
 
-    # === 中野梓 (Nakano Azusa) ===
-    r"中野梓": "なかのあずさ",
-    r"梓先輩": "あずさせんぱい",
-    r"梓[先前]辈": "あずさせんぱい",
-    r"梓ちゃん": "あずさちゃん",
-    r"梓[酱醤]": "あずさちゃん",
-    r"梓[喵猫]": "あずにゃん",
-    r"梓ニャン": "あずにゃん",
-    r"あずにゃん": "あずにゃん",
-    r"梓": "あずさ",
+    # --- 6. 平泽忧 (Hirasawa Ui) ---
+    (r"平[泽沢澤][忧憂]", "ひらさわうい"),
+    (r"[忧憂]ちゃん", "ういちゃん"),
+    (r"[忧憂][酱醤]", "ういちゃん"),
+    (r"小[忧憂]", "ういちゃん"),
+    (r"[忧憂]", "うい"),
 
-    # === 平泽忧 (Hirasawa Ui) ===
-    r"平[泽沢澤][忧憂]": "ひらさわうい",
-    r"[忧憂]ちゃん": "ういちゃん",
-    r"[忧憂][酱醤]": "ういちゃん",
-    r"[忧憂]": "うい",
+    # --- 7. 真锅和 (Manabe Nodoka) ---
+    (r"真[锅鍋]和", "まなべのどか"),
+    (r"和ちゃん", "のどかちゃん"),
+    (r"和[酱醤]", "のどかちゃん"),
+    (r"小和", "のどかちゃん"),
+    (r"真[锅鍋]", "まなべ"),
 
-    # === 真锅和 (Manabe Nodoka) ===
-    r"真[锅鍋]和": "まなべのどか",
-    r"和ちゃん": "のどかちゃん",
-    r"和[酱醤]": "のどかちゃん",
+    # --- 8. 山中佐和子 / 铃木纯 ---
+    (r"山中(?:さわ|佐和)子", "やまなかさわこ"),
+    (r"(?:さわ|佐和)子老[师師]|さわ子先生", "さわこせんせい"),
+    (r"さわちゃん", "さわちゃん"),
+    (r"[铃鈴]木[纯純]", "すずきじゅん"),
+    (r"[纯純]ちゃん", "じゅんちゃん"),
 
-    # === 山中佐和子 (Yamanaka Sawako) ===
-    r"山中さわ子": "やまなかさわこ",
-    r"山中佐和子": "やまなかさわこ",
-    r"さわ子先生": "さわこせんせい",
-    r"佐和子老[师師]": "さわこせんせい",
-    r"さわちゃん": "さわちゃん",
-
-    # === 铃木纯 (Suzuki Jun) ===
-    r"[铃鈴]木[纯純]": "すずきじゅん",
-    r"[纯純]ちゃん": "じゅんちゃん",
-
-    # === 乐器爱称 ===
-    r"ギ[ー〜]太": "ギータ",
-    r"ギー太": "ギータ",
-    r"エリザベス": "エリザベス",
-    r"むったん": "むったん",
-
-    # === 社团、乐队、学校 ===
-    r"放[课課]後ティータイム": "ほうかごティータイム",
-    r"放学后茶会": "ほうかごティータイム",
-    r"[轻軽]音部": "けいおんぶ",
-    r"[轻軽]音": "けいおん",
-    r"[Kk]-?[Oo][Nn]部": "けいおんぶ",
-    r"[Kk]-?[Oo][Nn]": "けいおん",
-    r"[樱桜]が丘高校": "さくらがおかこうこう",
-    r"[樱桜]が丘": "さくらがおか",
-    r"[樱桜]高": "さくらこう",
-    r"学[园園]祭": "がくえんさい",
-}
-
-# 编译正则（长模式优先匹配，避免短词提前截断）
-_K_ON_COMPILED = [
-    (re.compile(pattern), replacement)
-    for pattern, replacement in sorted(K_ON_PHONETIC_MAPPING.items(), key=lambda kv: -len(kv[0]))
+    # --- 9. 乐器爱称、社团、学校与专有名词 ---
+    (r"ギ[ー〜～]太|ギー太|吉太", "ギータ"),
+    (r"伊[丽麗]莎白", "エリザベス"),
+    (r"穆旦", "むったん"),
+    (r"放[课課]後ティータイム|放学后茶会", "ほうかごティータイム"),
+    (r"[Hh][Tt][Tt]", "エイチティーティー"),
+    (r"[轻軽]音部", "けいおんぶ"),
+    (r"[轻軽]音", "けいおん"),
+    (r"[Kk]-[Oo][Nn]部|[Kk][Oo][Nn]部", "けいおんぶ"),
+    (r"[Kk]-[Oo][Nn]|[Kk][Oo][Nn]", "けいおん"),
+    (r"[樱桜]が丘高校", "さくらがおかこうこう"),
+    (r"[樱桜]高", "さくらこう"),
+    (r"学[园園]祭", "がくえんさい"),
 ]
 
-
-def _apply_kon_phonetic(text: str) -> str:
-    """对文本应用 K-ON! 专有名词假名注音映射"""
-    for regex, replacement in _K_ON_COMPILED:
-        text = regex.sub(replacement, text)
+def _apply_kon_mapping(text: str) -> str:
+    for pattern, target in K_ON_SPECIAL_WORDS:
+        text = re.sub(pattern, target, text)
     return text
 
-
-def clean_and_normalize_text(text: str, language: str = "Japanese") -> str:
-    """
-    语言感知的文本预处理中间件。
-    - Japanese: 启用 K-ON 专有名词假名注音映射
-    - Chinese / English: 不进行任何映射，保持原文
-    - Multilingual Mixed: 不自动替换，仅对用户显式标注的 [JA]...[/JA] 区间内应用映射
+def clean_and_normalize_text(text: str, language: str = "Multilingual Mixed") -> str:
+    """按语言模式分流校准专有名词：
+    - Japanese: 全文应用 K-ON 日语专有名词映射表
+    - Multilingual Mixed: 仅对 [JA]...[/JA] 或 [JA]...[JA] 标签内文本应用映射表
+    - Chinese / English: 原样保留，不做替换
     """
     text = text.strip()
-    if not text:
-        return text
-
     if language == "Japanese":
-        # 日文模式：全文应用 K-ON 注音映射
-        text = _apply_kon_phonetic(text)
+        return _apply_kon_mapping(text)
     elif language == "Multilingual Mixed":
-        # 多语种混合模式：仅替换 [JA]...[/JA] 标签内的文本
-        def _replace_ja_block(m):
-            inner = m.group(1)
-            return _apply_kon_phonetic(inner)
-        text = re.sub(r"\[JA\](.*?)\[/JA\]", _replace_ja_block, text, flags=re.DOTALL)
-    # Chinese / English / 其他: 不做任何人名映射
-
-    # 清除残留的 [JA] 标签（非多语种模式下标签无意义），避免被朗读
-    text = re.sub(r"\[/?JA\]", "", text)
-    return text.strip()
+        return re.sub(
+            r"(\[JA\])(.*?)(\[/?JA\])",
+            lambda m: f"{m.group(1)}{_apply_kon_mapping(m.group(2))}{m.group(3)}",
+            text
+        )
+    return text
 
 def enhance_voice_clarity(audio_data: np.ndarray, sr: int) -> np.ndarray:
     """Butterworth 低通滤波切除高频金属毛刺 + 软噪声门消除底噪"""
@@ -296,7 +270,7 @@ def generate_character_speech(
 ):
     """支持 7 位角色独立声音模型与风格注入的统一语音合成接口"""
     target_lang = LANGUAGE_MAP.get(language, "Multilingual Mixed")
-    text = clean_and_normalize_text(text, target_lang)
+    text = clean_and_normalize_text(text, language=target_lang)
     if not text:
         raise ValueError("待合成文本内容不能为空哦！")
 
@@ -307,7 +281,7 @@ def generate_character_speech(
     if custom_ref_wav and os.path.exists(custom_ref_wav) and custom_prompt_text:
         ref_wav = custom_ref_wav
         ref_lang = LANGUAGE_MAP.get(custom_prompt_lang, "Japanese")
-        ref_text = clean_and_normalize_text(custom_prompt_text, ref_lang)
+        ref_text = clean_and_normalize_text(custom_prompt_text, language=ref_lang)
     else:
         if char_info["has_presets"]:
             matched = next((p for p in char_info["prompts"] if p["name"] == prompt_name), char_info["prompts"][0])
@@ -411,18 +385,11 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
             # --- 待合成文本 ---
             gr.Markdown("### 💬 3. 待合成文本 (支持中 / 日 / 英 / 混杂)")
             text_input = gr.Textbox(
-                label="目标台词内容",
-                placeholder="在此输入你想让角色说的话...",
+                label="目标台词内容 (多语种混合模式下，用 [JA]唯[/JA] 包裹可触发日文原声专有名词读音)",
+                placeholder="在此输入你想让角色说的话（例：大家好，我是[JA]平沢唯[/JA]！）...",
                 lines=4,
                 value=CHARACTERS["yui"]["default_text"]
             )
-            with gr.Row():
-                ja_tag_btn = gr.Button("🇯🇵 插入 [JA][/JA] 日文标签", size="sm")
-            gr.Markdown(
-                "<small>💡 仅「多语种混合」模式生效：写在 `[JA]…[/JA]` 内的文字会按日语读法并自动套用 K-ON! 人名注音表"
-                "（如 `大家好，我是[JA]平泽唯[/JA]`）；「日文」模式全文自动套用；「中文/英文」模式不做任何替换。</small>"
-            )
-            ja_tag_btn.click(lambda t: (t or "") + "[JA][/JA]", inputs=[text_input], outputs=[text_input], api_name=False)
 
             # --- 经典台词快速点选 ---
             with gr.Accordion("🍰 快速点选经典台词 (一键填入目标文本)", open=False):

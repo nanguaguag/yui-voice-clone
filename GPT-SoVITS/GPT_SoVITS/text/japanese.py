@@ -172,7 +172,24 @@ def preprocess_jap(text, with_prosody=False):
 
 
 def text_normalize(text):
-    # todo: jap text normalize
+    # 将跟在日文假名/汉字后的波浪号转换为长音符「ー」，保留延音语气同时避免生成 UNK 边界符
+    text = re.sub(r"([\u3040-\u30ff\u4e00-\u9fff])[~〜～]+", r"\1ー", text)
+    # 统一全角标点为标准符号，确保 replace_consecutive_punctuation 生效
+    punc_map = {
+        "：": ",",
+        "；": ",",
+        "，": ",",
+        "。": ".",
+        "！": "!",
+        "？": "?",
+        "、": ",",
+        "〜": ",",
+        "～": ",",
+        "~": ",",
+    }
+    for k, v in punc_map.items():
+        text = text.replace(k, v)
+    text = re.sub(r"\.{2,}", "…", text)
 
     # 避免重复标点引起的参考泄露
     text = replace_consecutive_punctuation(text)
@@ -264,45 +281,9 @@ def _numeric_feature_by_regex(regex, s):
     return int(match.group(1))
 
 
-_PROLONG_MARKS = {"~", "〜", "～"}
-_JA_VOWELS = {"a", "i", "u", "e", "o", "I", "U"}
-# 连续标点音素的合并优先级（越靠前越强，保留最强语气）
-_PUNC_PRIORITY = ["!", "?", "…", ",", ".", "-"]
-
-
-def canonicalize_phones(phones):
-    """音素层规范化（G2P 之后、送入模型之前）：
-    1. 波浪号 ~ / 〜 本质是前一元音的延长：展开为重复的元音音素（保留拖腔，不再产生非法符号）。
-    2. 连续的标点音素（如 …! / ?! / !!）在声学上都是零时长静音，叠加会使自回归注意力退化；
-       在音素序列上合并为单个、语气最强的标点。
-    """
-    expanded = []
-    for p in phones:
-        if p in _PROLONG_MARKS:
-            prev = next((q for q in reversed(expanded) if q not in ("[", "]")), None)
-            if prev in _JA_VOWELS:
-                expanded.append(prev)
-            continue
-        expanded.append(p)
-
-    result = []
-    run = []
-    for p in expanded + [None]:
-        if p in _PUNC_PRIORITY:
-            run.append(p)
-            continue
-        if run:
-            result.append(min(run, key=_PUNC_PRIORITY.index))
-            run = []
-        if p is not None:
-            result.append(p)
-    return result
-
-
 def g2p(norm_text, with_prosody=True):
     phones = preprocess_jap(norm_text, with_prosody)
     phones = [post_replace_ph(i) for i in phones]
-    phones = canonicalize_phones(phones)
     # todo: implement tones and word2ph
     return phones
 

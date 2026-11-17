@@ -699,13 +699,12 @@ splits = {
     ".",
     "?",
     "!",
+    "~",
     ":",
     "：",
     "—",
     "…",
 }
-# 注意: "~" 与 "〜" 不是分句标点，它们是日语口语延音/拖腔修饰符（如「すごい〜！」），
-# 不应触发分句切割，否则会切出纯标点空切片导致自回归模型崩溃。
 
 
 def get_first(text):
@@ -743,9 +742,20 @@ def get_phones_and_bert(text, language, version, final=False):
         langlist.append("en")
         textlist.append(text)
     elif language == "auto":
-        for tmp in LangSegmenter.getTexts(text):
-            langlist.append(tmp["lang"])
-            textlist.append(tmp["text"])
+        # 支持显式 [JA]...[/JA] 或 [JA]...[JA] 标签将特定片段强制路由至日语音素引擎
+        parts = re.split(r"(\[JA\].*?\[/?JA\])", text)
+        for part in parts:
+            if not part:
+                continue
+            if part.startswith("[JA]") and (part.endswith("[/JA]") or part.endswith("[JA]")):
+                inner = re.sub(r"^\[JA\]|\[/?JA\]$", "", part)
+                if inner.strip():
+                    langlist.append("ja")
+                    textlist.append(inner)
+            else:
+                for tmp in LangSegmenter.getTexts(part):
+                    langlist.append(tmp["lang"])
+                    textlist.append(tmp["text"])
     elif language == "auto_yue":
         for tmp in LangSegmenter.getTexts(text):
             if tmp["lang"] == "zh":
@@ -779,6 +789,21 @@ def get_phones_and_bert(text, language, version, final=False):
     bert = torch.cat(bert_list, dim=1)
     phones = sum(phones_list, [])
     norm_text = "".join(norm_text_list)
+
+    # 音素序列边界不变式守卫：过滤 UNK 并折叠跨语种拼接产生的连续标点音素，保持 bert 维度同步对齐
+    pu_set = {"!", "?", "…", ",", ".", "-", "SP", "SP2", "SP3", "UNK"}
+    keep_indices = []
+    for idx, ph in enumerate(phones):
+        if ph == "UNK":
+            continue
+        if ph in pu_set and keep_indices and phones[keep_indices[-1]] in pu_set:
+            if phones[keep_indices[-1]] in (",", "-", "…") and ph in ("!", "?", "."):
+                keep_indices[-1] = idx
+            continue
+        keep_indices.append(idx)
+    if keep_indices and len(keep_indices) < len(phones):
+        phones = [phones[i] for i in keep_indices]
+        bert = bert[:, keep_indices]
 
     if not final and len(phones) < 6:
         return get_phones_and_bert("." + text, language, version, final=True)
@@ -1205,18 +1230,7 @@ def split(todo_text):
             i_split_tail = i_split_head
         else:
             i_split_head += 1
-    # 架构级安全合并：将纯标点切片向前合并到前一段，彻底消除空切片送入模型的可能
-    _all_punc = splits | {"~", "〜", "\n", " "}
-    merged = []
-    for seg in todo_texts:
-        if set(seg).issubset(_all_punc):
-            # 纯标点/空白切片，向前合并
-            if merged:
-                merged[-1] += seg
-            # 如果是第一段就纯标点，丢弃（不可能产生有效语音）
-        else:
-            merged.append(seg)
-    return merged
+    return todo_texts
 
 
 def cut1(inp):
@@ -1310,16 +1324,11 @@ def process_text(texts):
     _text = []
     if all(text in [None, " ", "\n", ""] for text in texts):
         raise ValueError(i18n("请输入有效文本"))
-    _all_punc = splits | {"~", "〜", "\n", " ", ""}
     for text in texts:
         if text in [None, " ", ""]:
-            continue
-        # 跳过纯标点切片（已在 split() 中合并，这里做二次防御）
-        if set(text.strip()).issubset(_all_punc):
-            if _text:
-                _text[-1] += text
-            continue
-        _text.append(text)
+            pass
+        else:
+            _text.append(text)
     return _text
 
 
