@@ -699,12 +699,13 @@ splits = {
     ".",
     "?",
     "!",
-    "~",
     ":",
     "：",
     "—",
     "…",
 }
+# 注意: "~" 与 "〜" 不是分句标点，它们是日语口语延音/拖腔修饰符（如「すごい〜！」），
+# 不应触发分句切割，否则会切出纯标点空切片导致自回归模型崩溃。
 
 
 def get_first(text):
@@ -1204,7 +1205,18 @@ def split(todo_text):
             i_split_tail = i_split_head
         else:
             i_split_head += 1
-    return todo_texts
+    # 架构级安全合并：将纯标点切片向前合并到前一段，彻底消除空切片送入模型的可能
+    _all_punc = splits | {"~", "〜", "\n", " "}
+    merged = []
+    for seg in todo_texts:
+        if set(seg).issubset(_all_punc):
+            # 纯标点/空白切片，向前合并
+            if merged:
+                merged[-1] += seg
+            # 如果是第一段就纯标点，丢弃（不可能产生有效语音）
+        else:
+            merged.append(seg)
+    return merged
 
 
 def cut1(inp):
@@ -1298,11 +1310,16 @@ def process_text(texts):
     _text = []
     if all(text in [None, " ", "\n", ""] for text in texts):
         raise ValueError(i18n("请输入有效文本"))
+    _all_punc = splits | {"~", "〜", "\n", " ", ""}
     for text in texts:
         if text in [None, " ", ""]:
-            pass
-        else:
-            _text.append(text)
+            continue
+        # 跳过纯标点切片（已在 split() 中合并，这里做二次防御）
+        if set(text.strip()).issubset(_all_punc):
+            if _text:
+                _text[-1] += text
+            continue
+        _text.append(text)
     return _text
 
 
