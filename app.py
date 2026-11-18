@@ -12,6 +12,8 @@ import io
 import re
 import json
 import time
+import threading
+import subprocess
 import torch
 import numpy as np
 import soundfile as sf
@@ -254,6 +256,145 @@ def switch_character_model(char_id: str):
     print(f"✅ 模型热更完毕: {char_id} (耗时: {time.time() - t_start:.2f}s)")
 
 # 3. 核心合成函数
+_CPU_WORKER_LOCK = threading.Lock()
+_CPU_WORKER_PROC = None
+
+
+def _resolve_prompt_and_text(
+    char_id: str,
+    text: str,
+    prompt_name: str = "默认",
+    language: str = "auto",
+    custom_ref_wav: str = None,
+    custom_prompt_text: str = None,
+    custom_prompt_lang: str = None,
+):
+    target_lang = LANGUAGE_MAP.get(language, "Multilingual Mixed")
+    norm_text = clean_and_normalize_text(text, language=target_lang)
+    if not norm_text:
+        raise ValueError("待合成文本内容不能为空哦！")
+
+    char_info = CHARACTERS.get(char_id, CHARACTERS["yui"])
+    if custom_ref_wav and os.path.exists(custom_ref_wav) and custom_prompt_text:
+        ref_wav = custom_ref_wav
+        ref_lang = LANGUAGE_MAP.get(custom_prompt_lang, "Japanese")
+        ref_text = clean_and_normalize_text(custom_prompt_text, language=ref_lang)
+    elif char_info["has_presets"]:
+        matched = next((p for p in char_info["prompts"] if p["name"] == prompt_name), char_info["prompts"][0])
+        ref_wav = os.path.join(APP_DIR, matched["audio_path"])
+        ref_text = matched["prompt_text"]
+        ref_lang = "Japanese"
+    else:
+        default_p = char_info["default_prompt"]
+        ref_wav = os.path.join(APP_DIR, default_p["audio_path"])
+        ref_text = default_p["prompt_text"]
+        ref_lang = "Japanese"
+
+    return norm_text, target_lang, ref_wav, ref_text, ref_lang
+
+
+def _postprocess_audio(audio_data: np.ndarray, sr: int) -> np.ndarray:
+    if isinstance(audio_data, np.ndarray) and len(audio_data) > 0:
+        if audio_data.dtype == np.int16:
+            audio_data = audio_data.astype(np.float32) / 32767.0
+        elif audio_data.dtype != np.float32:
+            audio_data = audio_data.astype(np.float32)
+
+        audio_data = enhance_voice_clarity(audio_data, sr)
+        max_val = np.abs(audio_data).max()
+        if max_val > 1e-4:
+            audio_data = (audio_data / max_val * 0.95).astype(np.float32)
+    return audio_data
+
+
+def _run_cpu_worker_fallback(
+    char_id: str,
+    text: str,
+    prompt_name: str,
+    language: str,
+    speed: float,
+    top_k: int,
+    top_p: float,
+    temperature: float,
+    custom_ref_wav: str,
+    custom_prompt_text: str,
+    custom_prompt_lang: str,
+):
+    """在独立纯 CPU 子进程中运行推理，彻底隔离 ZeroGPU 主进程的 CUDA Hook"""
+    global _CPU_WORKER_PROC
+    norm_text, target_lang, ref_wav, ref_text, ref_lang = _resolve_prompt_and_text(
+        char_id=char_id,
+        text=text,
+        prompt_name=prompt_name,
+        language=language,
+        custom_ref_wav=custom_ref_wav,
+        custom_prompt_text=custom_prompt_text,
+        custom_prompt_lang=custom_prompt_lang,
+    )
+
+    with _CPU_WORKER_LOCK:
+        if _CPU_WORKER_PROC is None or _CPU_WORKER_PROC.poll() is not None:
+            env = os.environ.copy()
+            env["CUDA_VISIBLE_DEVICES"] = ""
+            env["device"] = "cpu"
+            env["is_half"] = "False"
+            worker_path = os.path.join(APP_DIR, "cpu_worker.py")
+            _CPU_WORKER_PROC = subprocess.Popen(
+                [sys.executable, "-u", worker_path],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=sys.stderr,
+                text=True,
+                env=env,
+            )
+            while True:
+                line = _CPU_WORKER_PROC.stdout.readline()
+                if not line:
+                    raise RuntimeError("CPU 推理子进程启动失败")
+                line = line.strip()
+                if line.startswith("{") and '"ready"' in line:
+                    break
+
+        payload = json.dumps({
+            "char_id": char_id,
+            "text": norm_text,
+            "target_lang": target_lang,
+            "ref_wav": ref_wav,
+            "ref_text": ref_text,
+            "ref_lang": ref_lang,
+            "speed": speed,
+            "top_k": top_k,
+            "top_p": top_p,
+            "temperature": temperature,
+        }, ensure_ascii=False)
+        _CPU_WORKER_PROC.stdin.write(payload + "\n")
+        _CPU_WORKER_PROC.stdin.flush()
+
+        resp = None
+        while True:
+            line = _CPU_WORKER_PROC.stdout.readline()
+            if not line:
+                _CPU_WORKER_PROC = None
+                raise RuntimeError("CPU 推理子进程意外退出")
+            line = line.strip()
+            if line.startswith("{") and ('"ok"' in line):
+                resp = json.loads(line)
+                break
+
+        if not resp.get("ok"):
+            raise RuntimeError(resp.get("error", "CPU worker unknown error"))
+
+        wav_path = resp["wav_path"]
+        try:
+            audio_data, sr = sf.read(wav_path, dtype="float32")
+        finally:
+            if os.path.exists(wav_path):
+                os.remove(wav_path)
+
+        audio_data = _postprocess_audio(audio_data, sr)
+        return sr, audio_data, float(resp["cost"])
+
+
 def _generate_character_speech_impl(
     char_id: str,
     text: str,
@@ -268,30 +409,16 @@ def _generate_character_speech_impl(
     custom_prompt_lang: str = None
 ):
     """支持 7 位角色独立声音模型与风格注入的统一语音合成底层实现"""
-    target_lang = LANGUAGE_MAP.get(language, "Multilingual Mixed")
-    text = clean_and_normalize_text(text, language=target_lang)
-    if not text:
-        raise ValueError("待合成文本内容不能为空哦！")
-
-    char_info = CHARACTERS.get(char_id, CHARACTERS["yui"])
+    norm_text, target_lang, ref_wav, ref_text, ref_lang = _resolve_prompt_and_text(
+        char_id=char_id,
+        text=text,
+        prompt_name=prompt_name,
+        language=language,
+        custom_ref_wav=custom_ref_wav,
+        custom_prompt_text=custom_prompt_text,
+        custom_prompt_lang=custom_prompt_lang,
+    )
     switch_character_model(char_id)
-
-    # 1. 确定声学参考音频与提示文本
-    if custom_ref_wav and os.path.exists(custom_ref_wav) and custom_prompt_text:
-        ref_wav = custom_ref_wav
-        ref_lang = LANGUAGE_MAP.get(custom_prompt_lang, "Japanese")
-        ref_text = clean_and_normalize_text(custom_prompt_text, language=ref_lang)
-    else:
-        if char_info["has_presets"]:
-            matched = next((p for p in char_info["prompts"] if p["name"] == prompt_name), char_info["prompts"][0])
-            ref_wav = os.path.join(APP_DIR, matched["audio_path"])
-            ref_text = matched["prompt_text"]
-            ref_lang = "Japanese"
-        else:
-            default_p = char_info["default_prompt"]
-            ref_wav = os.path.join(APP_DIR, default_p["audio_path"])
-            ref_text = default_p["prompt_text"]
-            ref_lang = "Japanese"
 
     # 2. 推理渲染
     t_start = time.time()
@@ -299,7 +426,7 @@ def _generate_character_speech_impl(
         ref_wav_path=ref_wav,
         prompt_text=ref_text,
         prompt_language=ref_lang,
-        text=text,
+        text=norm_text,
         text_language=target_lang,
         how_to_cut=infer.i18n("凑四句一切"),
         top_k=top_k,
@@ -309,19 +436,7 @@ def _generate_character_speech_impl(
     )
     sr, audio_data = next(gen)
     infer_cost = time.time() - t_start
-
-    # 3. 后处理与数值归一化
-    if isinstance(audio_data, np.ndarray) and len(audio_data) > 0:
-        if audio_data.dtype == np.int16:
-            audio_data = audio_data.astype(np.float32) / 32767.0
-        elif audio_data.dtype != np.float32:
-            audio_data = audio_data.astype(np.float32)
-
-        audio_data = enhance_voice_clarity(audio_data, sr)
-        max_val = np.abs(audio_data).max()
-        if max_val > 1e-4:
-            audio_data = (audio_data / max_val * 0.95).astype(np.float32)
-
+    audio_data = _postprocess_audio(audio_data, sr)
     return sr, audio_data, infer_cost
 
 
@@ -367,7 +482,7 @@ def generate_character_speech(
     custom_prompt_text: str = None,
     custom_prompt_lang: str = None
 ):
-    """优先使用 ZeroGPU，若无 Gradio 上下文或 ZeroGPU 配额耗尽则自动降级至 CPU 推理"""
+    """优先使用 ZeroGPU，若无 Gradio 上下文或 ZeroGPU 配额耗尽则自动降级至独立 CPU 子进程推理"""
     kwargs = dict(
         char_id=char_id,
         text=text,
@@ -391,12 +506,15 @@ def generate_character_speech(
             is_zero_fallback = (
                 "ZeroGPU" in err_name
                 or "ZeroGPU" in err_str
+                or "_cuda_init" in err_str
                 or ("NoneType" in err_str and "headers" in err_str)
                 or "x-ip-token" in err_str
             )
             if not is_zero_fallback:
                 raise
-            print(f"⚠️ ZeroGPU 不可用 ({err_name}: {err_str})，已自动切换至 CPU 推理...")
+            print(f"⚠️ ZeroGPU 不可用 ({err_name}: {err_str})，已自动切换至独立 CPU 子进程推理...")
+            sr, audio_data, infer_cost = _run_cpu_worker_fallback(**kwargs)
+            return sr, audio_data, infer_cost, "CPU"
     sr, audio_data, infer_cost = _generate_character_speech_impl(**kwargs)
     return sr, audio_data, infer_cost, "CPU"
 
