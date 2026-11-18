@@ -5,6 +5,27 @@ K-ON! 放学后茶会全员 7 大角色元数据、主题配色与预设语气�
 包含：平泽唯、秋山澪、田井中律、琴吹紬、中野梓、平泽忧、真锅和
 """
 
+import os
+import base64
+
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+_AVATAR_CACHE = {}
+
+def get_avatar_data_uri(char_id: str) -> str:
+    """加载并缓存角色缩略图头像 (优先 imgs/{cid}_small.png，加载极快)"""
+    if char_id in _AVATAR_CACHE:
+        return _AVATAR_CACHE[char_id]
+    for fname in (f"{char_id}_small.png", f"{char_id}.png"):
+        p = os.path.join(_APP_DIR, "imgs", fname)
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            uri = f"data:image/png;base64,{b64}"
+            _AVATAR_CACHE[char_id] = uri
+            return uri
+    _AVATAR_CACHE[char_id] = ""
+    return ""
+
 CHARACTERS = {
     "yui": {
         "id": "yui",
@@ -78,8 +99,8 @@ CHARACTERS = {
             "Hello everyone! Welcome to After School Tea Time! Let's rock!"
         ],
         "weights": {
-            "sovits": "yui_pure_v2_e10_s230.pth",
-            "gpt": "yui_pure_v2-e15.ckpt"
+            "sovits": "yui_pure_v3_e10_s200.pth",
+            "gpt": "yui_pure_v3-e15.ckpt"
         }
     },
     "mio": {
@@ -106,8 +127,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/mio_00056.wav",
-            "prompt_text": "お誕生日おめでとうございます。ういちゃん。",
+            "audio_path": "data/tts/slices/mio_00099.wav",
+            "prompt_text": "なんだかドキドキすることがあるかも。テストがうまくいきそう。",
             "prompt_language": "ja",
             "desc": "澪酱标志性沉稳清润的声线，带着微羞涩与认真的日常语调。"
         },
@@ -119,8 +140,8 @@ CHARACTERS = {
             "今天放学后，一定要把那段贝斯独奏好好练熟。"
         ],
         "weights": {
-            "sovits": "mio_pure_v2_e10_s220.pth",
-            "gpt": "mio_pure_v2-e15.ckpt"
+            "sovits": "mio_pure_v3_e10_s160.pth",
+            "gpt": "mio_pure_v3-e15.ckpt"
         }
     },
     "ritsu": {
@@ -147,8 +168,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/ritsu_00042.wav",
-            "prompt_text": "びっくりした！誕生日おめでとう！お祝いしようぜ！",
+            "audio_path": "data/tts/slices/ritsu_00118.wav",
+            "prompt_text": "キャベツ料理だ！髪型を変えるといいことがありそう！リズムキープがうまくできそうだ！",
             "prompt_language": "ja",
             "desc": "律队元气满满的大嗓门，豪爽乐观，充满领袖气息与欢快吐槽感。"
         },
@@ -160,8 +181,8 @@ CHARACTERS = {
             "吃完点心再练习嘛，这才叫放学后茶会呀！"
         ],
         "weights": {
-            "sovits": "ritsu_pure_v2_e10_s210.pth",
-            "gpt": "ritsu_pure_v2-e15.ckpt"
+            "sovits": "ritsu_pure_v3_e10_s180.pth",
+            "gpt": "ritsu_pure_v3-e15.ckpt"
         }
     },
     "tsumugi": {
@@ -188,8 +209,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/tsumugi_00054.wav",
-            "prompt_text": "今年のクリスマスも、みんなと過ごしたいわー！",
+            "audio_path": "data/tts/slices/tsumugi_00112.wav",
+            "prompt_text": "なんだか気分がウキウキするかも。なんだか元気が出ない一日になりそう。",
             "prompt_language": "ja",
             "desc": "温柔文雅、轻声细语的大小姐语气，带点对平民生活的新奇与甜美笑意。"
         },
@@ -201,8 +222,8 @@ CHARACTERS = {
             "能和大家一起在轻音部弹琴喝茶，是我最开心的事情了。"
         ],
         "weights": {
-            "sovits": "tsumugi_pure_v2_e10_s240.pth",
-            "gpt": "tsumugi_pure_v2-e15.ckpt"
+            "sovits": "tsumugi_pure_v3_e10_s200.pth",
+            "gpt": "tsumugi_pure_v3-e15.ckpt"
         }
     },
     "azusa": {
@@ -229,8 +250,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/azusa_00033.wav",
-            "prompt_text": "お誕生日ですよね。おめでとうございます。ハッピーバースデー！",
+            "audio_path": "data/tts/slices/azusa_00133.wav",
+            "prompt_text": "今日も部室のホワイトボードは落書きだらけです。黄色です。",
             "prompt_language": "ja",
             "desc": "认真严谨的学妹声线，带着标志性的微傲娇、被前辈抱住时的娇嗔与纯真。"
         },
@@ -242,8 +263,8 @@ CHARACTERS = {
             "喵……喵呜？！才、才不是什么梓喵呢！"
         ],
         "weights": {
-            "sovits": "azusa_pure_v2_e10_s220.pth",
-            "gpt": "azusa_pure_v2-e15.ckpt"
+            "sovits": "azusa_pure_v3_e10_s190.pth",
+            "gpt": "azusa_pure_v3-e15.ckpt"
         }
     },
     "ui": {
@@ -270,8 +291,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/ui_00077.wav",
-            "prompt_text": "えっと、これを選んだ人の今日の運勢は大吉みたいです。",
+            "audio_path": "data/tts/slices/ui_00056.wav",
+            "prompt_text": "お姉ちゃんにあげた、手袋の色です。ラッキーアイテムは、いちご牛乳です。",
             "prompt_language": "ja",
             "desc": "极其体贴温柔、像小妈妈一样宠爱姐姐的乖巧甜美声线。"
         },
@@ -283,8 +304,8 @@ CHARACTERS = {
             "今天的早餐做好了姐姐最喜欢的煎蛋卷和味噌汤哦~"
         ],
         "weights": {
-            "sovits": "ui_pure_v2_e10_s170.pth",
-            "gpt": "ui_pure_v2-e15.ckpt"
+            "sovits": "ui_pure_v3_e10_s220.pth",
+            "gpt": "ui_pure_v3-e15.ckpt"
         }
     },
     "nodoka": {
@@ -311,8 +332,8 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/nodoka_00043.wav",
-            "prompt_text": "福は内！今日はバレンタインデーね。いつものお礼よ。",
+            "audio_path": "data/tts/slices/nodoka_00069.wav",
+            "prompt_text": "道端に咲く綺麗な花の色よ。ラッキーアイテムはコーヒーよ。",
             "prompt_language": "ja",
             "desc": "理智沉稳、知性端庄的学生会长声线，说话条理清晰，充满关切。"
         },
@@ -324,8 +345,8 @@ CHARACTERS = {
             "从小到大，唯只要一专注起来，就会展现出不可思议的能量呢。"
         ],
         "weights": {
-            "sovits": "nodoka_pure_v2_e10_s160.pth",
-            "gpt": "nodoka_pure_v2-e15.ckpt"
+            "sovits": "nodoka_pure_v3_e10_s230.pth",
+            "gpt": "nodoka_pure_v3-e15.ckpt"
         }
     }
 }
@@ -419,20 +440,57 @@ body, .gradio-container {{
 """
 
 def get_character_header_html(char_id: str) -> str:
-    """生成角色专属的可爱风标题面板"""
+    """生成角色专属的可爱风标题面板（含卡通头像缩略图）"""
     c = CHARACTERS.get(char_id, CHARACTERS["yui"])
     t = c["theme"]
+    avatar_uri = get_avatar_data_uri(c["id"])
+    avatar_html = (
+        f'<img src="{avatar_uri}" alt="{c["short_name"]}" '
+        f'style="width: 88px; height: 88px; border-radius: 50%; object-fit: cover; '
+        f'border: 3px solid {t["primary"]}; box-shadow: 0 6px 16px {t["shadow"]}; '
+        f'flex-shrink: 0; background: #fff;" />'
+        if avatar_uri
+        else ""
+    )
+    strip_items = []
+    for k, ch in CHARACTERS.items():
+        u = get_avatar_data_uri(k)
+        if not u:
+            continue
+        is_active = (k == c["id"])
+        border_col = t["primary"] if is_active else "rgba(255,255,255,0.8)"
+        opacity = "1.0" if is_active else "0.55"
+        scale = "transform: scale(1.15);" if is_active else ""
+        strip_items.append(
+            f'<img src="{u}" title="{ch["short_name"]}" '
+            f'style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; '
+            f'border: 2px solid {border_col}; opacity: {opacity}; {scale} transition: all 0.2s;" />'
+        )
+    strip_html = (
+        '<div style="display: flex; justify-content: center; gap: 10px; margin-top: 10px;">'
+        + "".join(strip_items)
+        + "</div>"
+        if strip_items
+        else ""
+    )
+
     return f"""
     <div class="char-header">
-        <span class="char-badge">{c['avatar']} 放学后茶会 After School Tea Time</span>
-        <h1 class="char-title">{c['name']} 专属声音克隆</h1>
-        <p style="color: #64748B; font-size: 14px; margin: 4px 0 0 0;">
-            <b>身份/担当:</b> <span class="char-accent-text">{c['role']}</span> | 
-            <b>专属乐器/特质:</b> <span style="color: #475569;">{c['instrument']}</span>
-        </p>
-        <p style="color: #94A3B8; font-size: 13px; margin: 4px 0 0 0;">
-            基于 <b>GPT-SoVITS v2Pro</b> 打造的纯净干音专属神经音色引擎 | 支持跨语种高保真出声 🎵
-        </p>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap;">
+            {avatar_html}
+            <div style="text-align: left; max-width: 680px;">
+                <span class="char-badge">{c['avatar']} 放学后茶会 After School Tea Time (v3 Pure)</span>
+                <h1 class="char-title" style="margin: 4px 0;">{c['name']} 专属声音克隆</h1>
+                <p style="color: #64748B; font-size: 14px; margin: 4px 0 0 0;">
+                    <b>身份/担当:</b> <span class="char-accent-text">{c['role']}</span> | 
+                    <b>专属乐器/特质:</b> <span style="color: #475569;">{c['instrument']}</span>
+                </p>
+                <p style="color: #94A3B8; font-size: 13px; margin: 4px 0 0 0;">
+                    基于 <b>GPT-SoVITS v2Pro (v3 精校版)</b> 打造的纯净干音专属神经音色引擎 | 支持跨语种高保真出声 🎵
+                </p>
+            </div>
+        </div>
+        {strip_html}
     </div>
     """
 

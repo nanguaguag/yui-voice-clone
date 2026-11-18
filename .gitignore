@@ -12,3 +12,4 @@ pretrained_models/
 *.tar.gz
 *.zip
 *.log
+._*
