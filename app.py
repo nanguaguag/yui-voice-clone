@@ -254,8 +254,7 @@ def switch_character_model(char_id: str):
     print(f"✅ 模型热更完毕: {char_id} (耗时: {time.time() - t_start:.2f}s)")
 
 # 3. 核心合成函数
-@spaces.GPU
-def generate_character_speech(
+def _generate_character_speech_impl(
     char_id: str,
     text: str,
     prompt_name: str = "默认",
@@ -268,7 +267,7 @@ def generate_character_speech(
     custom_prompt_text: str = None,
     custom_prompt_lang: str = None
 ):
-    """支持 7 位角色独立声音模型与风格注入的统一语音合成接口"""
+    """支持 7 位角色独立声音模型与风格注入的统一语音合成底层实现"""
     target_lang = LANGUAGE_MAP.get(language, "Multilingual Mixed")
     text = clean_and_normalize_text(text, language=target_lang)
     if not text:
@@ -324,6 +323,82 @@ def generate_character_speech(
             audio_data = (audio_data / max_val * 0.95).astype(np.float32)
 
     return sr, audio_data, infer_cost
+
+
+@spaces.GPU
+def _generate_character_speech_gpu(
+    char_id: str,
+    text: str,
+    prompt_name: str = "默认",
+    language: str = "auto",
+    speed: float = 1.0,
+    top_k: int = 15,
+    top_p: float = 0.8,
+    temperature: float = 0.8,
+    custom_ref_wav: str = None,
+    custom_prompt_text: str = None,
+    custom_prompt_lang: str = None
+):
+    return _generate_character_speech_impl(
+        char_id=char_id,
+        text=text,
+        prompt_name=prompt_name,
+        language=language,
+        speed=speed,
+        top_k=top_k,
+        top_p=top_p,
+        temperature=temperature,
+        custom_ref_wav=custom_ref_wav,
+        custom_prompt_text=custom_prompt_text,
+        custom_prompt_lang=custom_prompt_lang,
+    )
+
+
+def generate_character_speech(
+    char_id: str,
+    text: str,
+    prompt_name: str = "默认",
+    language: str = "auto",
+    speed: float = 1.0,
+    top_k: int = 15,
+    top_p: float = 0.8,
+    temperature: float = 0.8,
+    custom_ref_wav: str = None,
+    custom_prompt_text: str = None,
+    custom_prompt_lang: str = None
+):
+    """优先使用 ZeroGPU，若无 Gradio 上下文或 ZeroGPU 配额耗尽则自动降级至 CPU 推理"""
+    kwargs = dict(
+        char_id=char_id,
+        text=text,
+        prompt_name=prompt_name,
+        language=language,
+        speed=speed,
+        top_k=top_k,
+        top_p=top_p,
+        temperature=temperature,
+        custom_ref_wav=custom_ref_wav,
+        custom_prompt_text=custom_prompt_text,
+        custom_prompt_lang=custom_prompt_lang,
+    )
+    if has_spaces:
+        try:
+            sr, audio_data, infer_cost = _generate_character_speech_gpu(**kwargs)
+            return sr, audio_data, infer_cost, "ZeroGPU"
+        except Exception as e:
+            err_name = type(e).__name__
+            err_str = str(e)
+            is_zero_fallback = (
+                "ZeroGPU" in err_name
+                or "ZeroGPU" in err_str
+                or ("NoneType" in err_str and "headers" in err_str)
+                or "x-ip-token" in err_str
+            )
+            if not is_zero_fallback:
+                raise
+            print(f"⚠️ ZeroGPU 不可用 ({err_name}: {err_str})，已自动切换至 CPU 推理...")
+    sr, audio_data, infer_cost = _generate_character_speech_impl(**kwargs)
+    return sr, audio_data, infer_cost, "CPU"
 
 # 4. Gradio 动态多主题页面设计
 BASE_CSS = """
@@ -508,7 +583,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
     def on_generate(char_id, text, prompt_choice, lang, speed, top_k, top_p, temp, c_audio, c_text, c_lang):
         t_before = time.time()
         try:
-            sr, wav_data, cost = generate_character_speech(
+            sr, wav_data, cost, backend_mode = generate_character_speech(
                 char_id=char_id,
                 text=text,
                 prompt_name=prompt_choice,
@@ -524,7 +599,12 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
             total_cost = time.time() - t_before
             dur = len(wav_data) / sr
             c_name = CHARACTERS.get(char_id, CHARACTERS["yui"])["name"]
-            msg = f"🎉 [{c_name}] 合成成功！模型推理: {cost:.2f}s | 总耗时: {total_cost:.2f}s | 音频时长: {dur:.2f}s"
+            if backend_mode == "CPU" and has_spaces:
+                gr.Warning("ZeroGPU 额度已用尽或不可用，本次已自动切换为 CPU 推理（耗时较长）！")
+                prefix = "⚠️ ZeroGPU 不可用/额度已满，已自动降级为 CPU 推理 | "
+            else:
+                prefix = f"⚡ 算力后端: {backend_mode} | "
+            msg = f"{prefix}🎉 [{c_name}] 合成成功！模型推理: {cost:.2f}s | 总耗时: {total_cost:.2f}s | 音频时长: {dur:.2f}s"
             return (sr, wav_data), msg
         except Exception as e:
             return None, f"❌ 合成失败: {str(e)}"
@@ -577,7 +657,7 @@ def api_tts_get(
     char_id = character.lower()
     if char_id not in CHARACTERS:
         char_id = "yui"
-    sr, audio_data, cost = generate_character_speech(
+    sr, audio_data, cost, backend_mode = generate_character_speech(
         char_id=char_id,
         text=text,
         prompt_name=prompt,
@@ -591,7 +671,12 @@ def api_tts_get(
     return Response(
         content=buf.read(),
         media_type="audio/wav",
-        headers={"X-Infer-Cost": f"{cost:.3f}s", "X-Audio-Sample-Rate": str(sr), "X-Character": char_id}
+        headers={
+            "X-Infer-Cost": f"{cost:.3f}s",
+            "X-Audio-Sample-Rate": str(sr),
+            "X-Character": char_id,
+            "X-Compute-Backend": backend_mode,
+        }
     )
 
 @demo.app.post("/api/tts")
@@ -611,7 +696,7 @@ async def api_tts_post(request: Request):
     top_p = float(req.get("top_p", 0.8))
     temperature = float(req.get("temperature", 0.8))
 
-    sr, audio_data, cost = generate_character_speech(
+    sr, audio_data, cost, backend_mode = generate_character_speech(
         char_id=character,
         text=text,
         prompt_name=prompt,
@@ -628,7 +713,12 @@ async def api_tts_post(request: Request):
     return Response(
         content=buf.read(),
         media_type="audio/wav",
-        headers={"X-Infer-Cost": f"{cost:.3f}s", "X-Audio-Sample-Rate": str(sr), "X-Character": character}
+        headers={
+            "X-Infer-Cost": f"{cost:.3f}s",
+            "X-Audio-Sample-Rate": str(sr),
+            "X-Character": character,
+            "X-Compute-Backend": backend_mode,
+        }
     )
 
 # 确保 demo.app 上的自定义 FastAPI 路由随 demo.launch() 自动挂载
