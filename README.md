@@ -8,7 +8,7 @@ sdk_version: 4.44.1
 app_file: app.py
 pinned: false
 license: mit
-short_description: 基于 GPT-SoVITS v2Pro (v3 精校版) 的《轻音少女》7 角色纯净声音克隆引擎，支持动态主题、卡通头像与极速 REST API！
+short_description: 基于 GPT-SoVITS v2Pro (v3) 的轻音少女 7 角色纯净声音克隆与 REST API！
 ---
 
 <div align="center">
