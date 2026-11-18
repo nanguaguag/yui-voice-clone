@@ -1,4 +1,4 @@
-<!-- ---
+---
 title: K-ON! 放学后茶会全员声音克隆引擎 (After School Tea Time Voice Clone)
 emoji: 🎸
 colorFrom: pink
@@ -9,7 +9,7 @@ app_file: app.py
 pinned: false
 license: mit
 short_description: 基于 GPT-SoVITS v2Pro (v3) 的轻音少女 7 角色纯净声音克隆与 REST API！
---- -->
+---
 
 <div align="center">
 
