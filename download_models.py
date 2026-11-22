@@ -7,13 +7,13 @@ import sys
 import urllib.request
 
 CHARACTER_WEIGHT_FILENAMES = {
-    "yui": ("yui_pure_v3_e10_s200.pth", "yui_pure_v3-e15.ckpt"),
-    "mio": ("mio_pure_v3_e10_s160.pth", "mio_pure_v3-e15.ckpt"),
-    "ritsu": ("ritsu_pure_v3_e10_s180.pth", "ritsu_pure_v3-e15.ckpt"),
-    "tsumugi": ("tsumugi_pure_v3_e10_s200.pth", "tsumugi_pure_v3-e15.ckpt"),
-    "azusa": ("azusa_pure_v3_e10_s190.pth", "azusa_pure_v3-e15.ckpt"),
-    "ui": ("ui_pure_v3_e10_s220.pth", "ui_pure_v3-e15.ckpt"),
-    "nodoka": ("nodoka_pure_v3_e10_s230.pth", "nodoka_pure_v3-e15.ckpt"),
+    "yui": ("yui_pure_v4_e8_s248.pth", "yui_pure_v4-e15.ckpt"),
+    "mio": ("mio_pure_v4_e8_s384.pth", "mio_pure_v4-e15.ckpt"),
+    "ritsu": ("ritsu_pure_v4_e8_s216.pth", "ritsu_pure_v4-e15.ckpt"),
+    "tsumugi": ("tsumugi_pure_v4_e8_s256.pth", "tsumugi_pure_v4-e15.ckpt"),
+    "azusa": ("azusa_pure_v4_e8_s256.pth", "azusa_pure_v4-e15.ckpt"),
+    "ui": ("ui_pure_v4_e8_s312.pth", "ui_pure_v4-e15.ckpt"),
+    "nodoka": ("nodoka_pure_v4_e8_s280.pth", "nodoka_pure_v4-e15.ckpt"),
 }
 
 def download_file(url, target_path, min_size=1024):
@@ -96,43 +96,43 @@ def ensure_models(base_dir="."):
         )
         print("✅ 声纹特征模型就绪！")
 
-    # 5. 确保默认平泽唯微调模型权重就绪 (v3)
-    gpt_weight = os.path.join(base_dir, "weights/yui_pure_v3/GPT_weights_v2Pro/yui_pure_v3-e15.ckpt")
-    sovits_weight = os.path.join(base_dir, "weights/yui_pure_v3/SoVITS_weights_v2Pro/yui_pure_v3_e10_s200.pth")
+    # 5. 确保默认平泽唯微调模型权重就绪 (v4 v2ProPlus)
+    gpt_weight = os.path.join(base_dir, "weights/yui_pure_v4/GPT_weights_v2ProPlus/yui_pure_v4-e15.ckpt")
+    sovits_weight = os.path.join(base_dir, "weights/yui_pure_v4/SoVITS_weights_v2ProPlus/yui_pure_v4_e8_s248.pth")
 
     # 若本地已有 PSSD 目录则优先复用
-    local_p1_s = "/Volumes/My PSSD/projects/FLUX3/weights/yui_pure_v3/SoVITS_weights_v2Pro/yui_pure_v3_e10_s200.pth"
-    local_p1_g = "/Volumes/My PSSD/projects/FLUX3/weights/yui_pure_v3/GPT_weights_v2Pro/yui_pure_v3-e15.ckpt"
+    local_p1_s = "/Volumes/My PSSD/projects/FLUX3/weights/yui_pure_v4/SoVITS_weights_v2ProPlus/yui_pure_v4_e8_s248.pth"
+    local_p1_g = "/Volumes/My PSSD/projects/FLUX3/weights/yui_pure_v4/GPT_weights_v2ProPlus/yui_pure_v4-e15.ckpt"
     if os.path.exists(local_p1_s) and os.path.exists(local_p1_g):
         sovits_weight = local_p1_s
         gpt_weight = local_p1_g
     else:
         try:
             download_file(
-                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v3.0.0/yui_pure_v3-e15.ckpt",
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v4.0.0/yui_pure_v4-e15.ckpt",
                 gpt_weight,
                 min_size=10 * 1024 * 1024
             )
         except Exception as e:
-            print(f"⚠️ 下载 v3.0.0 GPT 权重失败: {e}，尝试回退 v2.0.0...")
-            gpt_weight = os.path.join(base_dir, "weights/GPT_weights_v2Pro/yui_pure_v2-e15.ckpt")
+            print(f"⚠️ 下载 v4.0.0 GPT 权重失败: {e}，尝试回退 v3.0.0...")
+            gpt_weight = os.path.join(base_dir, "weights/yui_pure_v3/GPT_weights_v2Pro/yui_pure_v3-e15.ckpt")
             download_file(
-                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2-e15.ckpt",
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v3.0.0/yui_pure_v3-e15.ckpt",
                 gpt_weight,
                 min_size=10 * 1024 * 1024
             )
 
         try:
             download_file(
-                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v3.0.0/yui_pure_v3_e10_s200.pth",
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v4.0.0/yui_pure_v4_e8_s248.pth",
                 sovits_weight,
                 min_size=10 * 1024 * 1024
             )
         except Exception as e:
-            print(f"⚠️ 下载 v3.0.0 SoVITS 权重失败: {e}，尝试回退 v2.0.0...")
-            sovits_weight = os.path.join(base_dir, "weights/SoVITS_weights_v2Pro/yui_pure_v2_e10_s230.pth")
+            print(f"⚠️ 下载 v4.0.0 SoVITS 权重失败: {e}，尝试回退 v3.0.0...")
+            sovits_weight = os.path.join(base_dir, "weights/yui_pure_v3/SoVITS_weights_v2Pro/yui_pure_v3_e10_s200.pth")
             download_file(
-                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v2.0.0/yui_pure_v2_e10_s230.pth",
+                "https://github.com/nanguaguag/yui-voice-clone/releases/download/v3.0.0/yui_pure_v3_e10_s200.pth",
                 sovits_weight,
                 min_size=10 * 1024 * 1024
             )
@@ -158,32 +158,32 @@ def ensure_character_weights(char_id: str, base_dir="."):
     s_name, g_name = CHARACTER_WEIGHT_FILENAMES[char_id]
     
     # 候选 1: 本地移动硬盘 projects 根目录
-    local_p1_s = f"/Volumes/My PSSD/projects/FLUX3/weights/{char_id}_pure_v3/SoVITS_weights_v2Pro/{s_name}"
-    local_p1_g = f"/Volumes/My PSSD/projects/FLUX3/weights/{char_id}_pure_v3/GPT_weights_v2Pro/{g_name}"
+    local_p1_s = f"/Volumes/My PSSD/projects/FLUX3/weights/{char_id}_pure_v4/SoVITS_weights_v2ProPlus/{s_name}"
+    local_p1_g = f"/Volumes/My PSSD/projects/FLUX3/weights/{char_id}_pure_v4/GPT_weights_v2ProPlus/{g_name}"
     if os.path.exists(local_p1_s) and os.path.exists(local_p1_g):
         return local_p1_s, local_p1_g
 
     # 候选 2: 容器/工作区内的 weights 目录
-    target_s = os.path.join(base_dir, f"weights/{char_id}_pure_v3/SoVITS_weights_v2Pro/{s_name}")
-    target_g = os.path.join(base_dir, f"weights/{char_id}_pure_v3/GPT_weights_v2Pro/{g_name}")
+    target_s = os.path.join(base_dir, f"weights/{char_id}_pure_v4/SoVITS_weights_v2ProPlus/{s_name}")
+    target_g = os.path.join(base_dir, f"weights/{char_id}_pure_v4/GPT_weights_v2ProPlus/{g_name}")
     if os.path.exists(target_s) and os.path.exists(target_g):
         return target_s, target_g
 
-    # 尝试从 GitHub Release v3.0.0 下载
+    # 尝试从 GitHub Release v4.0.0 下载
     try:
         download_file(
-            f"https://github.com/nanguaguag/yui-voice-clone/releases/download/v3.0.0/{s_name}",
+            f"https://github.com/nanguaguag/yui-voice-clone/releases/download/v4.0.0/{s_name}",
             target_s,
             min_size=10 * 1024 * 1024
         )
         download_file(
-            f"https://github.com/nanguaguag/yui-voice-clone/releases/download/v3.0.0/{g_name}",
+            f"https://github.com/nanguaguag/yui-voice-clone/releases/download/v4.0.0/{g_name}",
             target_g,
             min_size=10 * 1024 * 1024
         )
         return target_s, target_g
     except Exception as e:
-        print(f"⚠️ 下载 {char_id} v3 权重异常: {e}，回退使用平泽唯模型")
+        print(f"⚠️ 下载 {char_id} v4 权重异常: {e}，回退使用平泽唯模型")
         if char_id != "yui":
             return ensure_character_weights("yui", base_dir)
         raise e

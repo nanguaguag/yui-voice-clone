@@ -11,6 +11,7 @@ import os
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import numpy as np
 import soundfile as sf
 
@@ -67,6 +68,8 @@ def main():
             req = json.loads(raw)
             switch_char(req["char_id"])
             t0 = time.time()
+            inp_ref_paths = req.get("inp_refs") or []
+            inp_refs = [SimpleNamespace(name=p) for p in inp_ref_paths if p and os.path.exists(p)] or None
             gen = infer.get_tts_wav(
                 ref_wav_path=req["ref_wav"],
                 prompt_text=req["ref_text"],
@@ -78,6 +81,7 @@ def main():
                 top_p=float(req["top_p"]),
                 temperature=float(req["temperature"]),
                 speed=float(req["speed"]),
+                inp_refs=inp_refs,
             )
             sr, audio_data = next(gen)
             cost = time.time() - t0

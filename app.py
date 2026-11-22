@@ -14,6 +14,7 @@ import json
 import time
 import threading
 import subprocess
+from types import SimpleNamespace
 import torch
 import numpy as np
 import soundfile as sf
@@ -46,7 +47,9 @@ except ImportError:
 
     class spaces:
         @staticmethod
-        def GPU(func):
+        def GPU(func=None, **kwargs):
+            if func is None:
+                return lambda f: f
             return func
 
 # 1. 动态挂载 GPT-SoVITS 源码与环境目录
@@ -196,30 +199,38 @@ def clean_and_normalize_text(text: str, language: str = "Multilingual Mixed") ->
     return text
 
 def enhance_voice_clarity(audio_data: np.ndarray, sr: int) -> np.ndarray:
-    """Butterworth 低通滤波切除高频金属毛刺 + 软噪声门消除底噪"""
+    """温和低通滤波抑制高频毛刺 + 平滑包络软噪声门（无 100Hz 阶跃斩波电音）"""
     if len(audio_data) == 0:
         return audio_data
     nyquist = sr / 2.0
-    cutoff = min(11500.0, nyquist - 200.0)
+    cutoff = min(12000.0, nyquist - 200.0)
     norm_cutoff = cutoff / nyquist
     b, a = signal.butter(2, norm_cutoff, btype='low', analog=False)
     filtered = signal.filtfilt(b, a, audio_data)
 
     window_size = int(sr * 0.02)
     stride = int(sr * 0.01)
-    if len(filtered) > window_size:
+    if len(filtered) > window_size * 2:
         padded = np.pad(filtered, (0, window_size), mode='reflect')
+        frame_starts = np.arange(0, len(filtered), stride)
         energy = np.array([
-            np.sqrt(np.mean(padded[i:i + window_size] ** 2))
-            for i in range(0, len(filtered), stride)
-        ])
-        threshold = max(float(np.percentile(energy, 10)) * 1.5, 0.003)
-        gain = np.ones(len(filtered), dtype=np.float32)
-        for idx, e in enumerate(energy):
-            start = idx * stride
-            end = min(start + stride, len(filtered))
-            if e < threshold:
-                gain[start:end] = np.clip(e / threshold, 0.1, 1.0)
+            np.sqrt(np.mean(padded[i:i + window_size] ** 2) + 1e-12)
+            for i in frame_starts
+        ], dtype=np.float32)
+        threshold = max(float(np.percentile(energy, 10)) * 1.2, 0.002)
+        frame_gain = np.where(
+            energy < threshold,
+            np.clip(energy / threshold, 0.35, 1.0),
+            1.0,
+        ).astype(np.float32)
+        # 一阶平滑包络 + 线性插值到采样点，彻底消除帧边界阶跃电流感
+        smooth_frames = np.empty_like(frame_gain)
+        smooth_frames[0] = frame_gain[0]
+        for idx in range(1, len(frame_gain)):
+            alpha = 0.5 if frame_gain[idx] > smooth_frames[idx - 1] else 0.15
+            smooth_frames[idx] = alpha * frame_gain[idx] + (1.0 - alpha) * smooth_frames[idx - 1]
+        sample_idx = np.arange(len(filtered), dtype=np.float32)
+        gain = np.interp(sample_idx, frame_starts.astype(np.float32), smooth_frames).astype(np.float32)
         filtered = filtered * gain
 
     return filtered.astype(np.float32)
@@ -275,6 +286,7 @@ def _resolve_prompt_and_text(
         raise ValueError("待合成文本内容不能为空哦！")
 
     char_info = CHARACTERS.get(char_id, CHARACTERS["yui"])
+    aux_ref_paths = []
     if custom_ref_wav and os.path.exists(custom_ref_wav) and custom_prompt_text:
         ref_wav = custom_ref_wav
         ref_lang = LANGUAGE_MAP.get(custom_prompt_lang, "Japanese")
@@ -284,13 +296,25 @@ def _resolve_prompt_and_text(
         ref_wav = os.path.join(APP_DIR, matched["audio_path"])
         ref_text = matched["prompt_text"]
         ref_lang = "Japanese"
+        # 仅当使用同域 v4 干音参考时启用多参考融合，避免动画切片与 PSP 干音混拼
+        if "data/tts/slices/" in matched["audio_path"]:
+            aux_ref_paths = [
+                os.path.join(APP_DIR, p)
+                for p in char_info.get("aux_refs", [])
+                if os.path.exists(os.path.join(APP_DIR, p))
+            ]
     else:
         default_p = char_info["default_prompt"]
         ref_wav = os.path.join(APP_DIR, default_p["audio_path"])
         ref_text = default_p["prompt_text"]
         ref_lang = "Japanese"
+        aux_ref_paths = [
+            os.path.join(APP_DIR, p)
+            for p in char_info.get("aux_refs", [])
+            if os.path.exists(os.path.join(APP_DIR, p))
+        ]
 
-    return norm_text, target_lang, ref_wav, ref_text, ref_lang
+    return norm_text, target_lang, ref_wav, ref_text, ref_lang, aux_ref_paths
 
 
 def _postprocess_audio(audio_data: np.ndarray, sr: int) -> np.ndarray:
@@ -322,7 +346,7 @@ def _run_cpu_worker_fallback(
 ):
     """在独立纯 CPU 子进程中运行推理，彻底隔离 ZeroGPU 主进程的 CUDA Hook"""
     global _CPU_WORKER_PROC
-    norm_text, target_lang, ref_wav, ref_text, ref_lang = _resolve_prompt_and_text(
+    norm_text, target_lang, ref_wav, ref_text, ref_lang, aux_ref_paths = _resolve_prompt_and_text(
         char_id=char_id,
         text=text,
         prompt_name=prompt_name,
@@ -362,6 +386,7 @@ def _run_cpu_worker_fallback(
             "ref_wav": ref_wav,
             "ref_text": ref_text,
             "ref_lang": ref_lang,
+            "inp_refs": aux_ref_paths,
             "speed": speed,
             "top_k": top_k,
             "top_p": top_p,
@@ -401,15 +426,15 @@ def _generate_character_speech_impl(
     prompt_name: str = "默认",
     language: str = "auto",
     speed: float = 1.0,
-    top_k: int = 15,
-    top_p: float = 0.8,
-    temperature: float = 0.8,
+    top_k: int = 12,
+    top_p: float = 0.75,
+    temperature: float = 0.75,
     custom_ref_wav: str = None,
     custom_prompt_text: str = None,
     custom_prompt_lang: str = None
 ):
     """支持 7 位角色独立声音模型与风格注入的统一语音合成底层实现"""
-    norm_text, target_lang, ref_wav, ref_text, ref_lang = _resolve_prompt_and_text(
+    norm_text, target_lang, ref_wav, ref_text, ref_lang, aux_ref_paths = _resolve_prompt_and_text(
         char_id=char_id,
         text=text,
         prompt_name=prompt_name,
@@ -419,6 +444,7 @@ def _generate_character_speech_impl(
         custom_prompt_lang=custom_prompt_lang,
     )
     switch_character_model(char_id)
+    inp_refs = [SimpleNamespace(name=p) for p in aux_ref_paths if p and os.path.exists(p)] or None
 
     # 2. 推理渲染
     t_start = time.time()
@@ -433,6 +459,7 @@ def _generate_character_speech_impl(
         top_p=top_p,
         temperature=temperature,
         speed=speed,
+        inp_refs=inp_refs,
     )
     sr, audio_data = next(gen)
     infer_cost = time.time() - t_start
@@ -440,16 +467,16 @@ def _generate_character_speech_impl(
     return sr, audio_data, infer_cost
 
 
-@spaces.GPU
+@spaces.GPU(duration=120)
 def _generate_character_speech_gpu(
     char_id: str,
     text: str,
     prompt_name: str = "默认",
     language: str = "auto",
     speed: float = 1.0,
-    top_k: int = 15,
-    top_p: float = 0.8,
-    temperature: float = 0.8,
+    top_k: int = 12,
+    top_p: float = 0.75,
+    temperature: float = 0.75,
     custom_ref_wav: str = None,
     custom_prompt_text: str = None,
     custom_prompt_lang: str = None
@@ -475,14 +502,18 @@ def generate_character_speech(
     prompt_name: str = "默认",
     language: str = "auto",
     speed: float = 1.0,
-    top_k: int = 15,
-    top_p: float = 0.8,
-    temperature: float = 0.8,
+    top_k: int = 12,
+    top_p: float = 0.75,
+    temperature: float = 0.75,
     custom_ref_wav: str = None,
     custom_prompt_text: str = None,
-    custom_prompt_lang: str = None
+    custom_prompt_lang: str = None,
+    use_gpu: bool = False,
 ):
-    """优先使用 ZeroGPU，若无 Gradio 上下文或 ZeroGPU 配额耗尽则自动降级至独立 CPU 子进程推理"""
+    """默认走纯 CPU 稳定推理（彻底杜绝 ZeroGPU 额度/超时中途截断无声）；
+    仅当显式传入 use_gpu=True 时尝试 ZeroGPU，若途中配额耗尽、异常中断或输出静音截断，
+    自动无缝回退至独立 CPU 子进程完整重生成。
+    """
     kwargs = dict(
         char_id=char_id,
         text=text,
@@ -496,25 +527,28 @@ def generate_character_speech(
         custom_prompt_text=custom_prompt_text,
         custom_prompt_lang=custom_prompt_lang,
     )
-    if has_spaces:
+    if use_gpu and has_spaces:
         try:
             sr, audio_data, infer_cost = _generate_character_speech_gpu(**kwargs)
+            # 完整性校验：防止 ZeroGPU 中途被强杀或截断导致输出极短/纯静音
+            if (
+                not isinstance(audio_data, np.ndarray)
+                or len(audio_data) < int(sr * 0.15)
+                or float(np.abs(audio_data).max()) < 1e-4
+            ):
+                raise RuntimeError("ZeroGPU 返回音频异常截断或纯静音")
             return sr, audio_data, infer_cost, "ZeroGPU"
         except Exception as e:
             err_name = type(e).__name__
             err_str = str(e)
-            is_zero_fallback = (
-                "ZeroGPU" in err_name
-                or "ZeroGPU" in err_str
-                or "_cuda_init" in err_str
-                or ("NoneType" in err_str and "headers" in err_str)
-                or "x-ip-token" in err_str
-            )
-            if not is_zero_fallback:
-                raise
-            print(f"⚠️ ZeroGPU 不可用 ({err_name}: {err_str})，已自动切换至独立 CPU 子进程推理...")
+            print(f"⚠️ ZeroGPU 推理异常/中断 ({err_name}: {err_str})，正在自动切换至独立 CPU 子进程完整重生成...")
             sr, audio_data, infer_cost = _run_cpu_worker_fallback(**kwargs)
-            return sr, audio_data, infer_cost, "CPU"
+            return sr, audio_data, infer_cost, "CPU-Fallback"
+
+    # 默认稳定路径：HF ZeroGPU 容器内使用独立隔离 CPU 子进程，本地环境直接本进程 CPU 推理
+    if has_spaces:
+        sr, audio_data, infer_cost = _run_cpu_worker_fallback(**kwargs)
+        return sr, audio_data, infer_cost, "CPU"
     sr, audio_data, infer_cost = _generate_character_speech_impl(**kwargs)
     return sr, audio_data, infer_cost, "CPU"
 
@@ -630,9 +664,13 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
 
             with gr.Accordion("⚙️ 高级模型参数 (可选)", open=False):
                 with gr.Row():
-                    top_k_slider = gr.Slider(minimum=1, maximum=30, value=15, step=1, label="Top-K")
-                    top_p_slider = gr.Slider(minimum=0.1, maximum=1.0, value=0.8, step=0.05, label="Top-P")
-                    temp_slider = gr.Slider(minimum=0.1, maximum=1.5, value=0.8, step=0.05, label="Temperature")
+                    top_k_slider = gr.Slider(minimum=1, maximum=30, value=12, step=1, label="Top-K")
+                    top_p_slider = gr.Slider(minimum=0.1, maximum=1.0, value=0.75, step=0.05, label="Top-P")
+                    temp_slider = gr.Slider(minimum=0.1, maximum=1.5, value=0.75, step=0.05, label="Temperature")
+                use_gpu_checkbox = gr.Checkbox(
+                    label="⚡ 启用 ZeroGPU 加速 (默认关闭：纯 CPU 仅需数秒且永不因额度中断；若 GPU 中断将自动完整回退 CPU)",
+                    value=False
+                )
 
             generate_btn = gr.Button("🍓 让平泽唯发声！ (Generate Speech)", variant="primary", elem_classes=["char-btn"])
 
@@ -698,7 +736,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
     )
 
     # --- 点击生成交互回调 ---
-    def on_generate(char_id, text, prompt_choice, lang, speed, top_k, top_p, temp, c_audio, c_text, c_lang):
+    def on_generate(char_id, text, prompt_choice, lang, speed, top_k, top_p, temp, c_audio, c_text, c_lang, use_gpu):
         t_before = time.time()
         try:
             sr, wav_data, cost, backend_mode = generate_character_speech(
@@ -712,14 +750,15 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
                 temperature=float(temp),
                 custom_ref_wav=c_audio,
                 custom_prompt_text=c_text,
-                custom_prompt_lang=c_lang
+                custom_prompt_lang=c_lang,
+                use_gpu=bool(use_gpu),
             )
             total_cost = time.time() - t_before
             dur = len(wav_data) / sr
             c_name = CHARACTERS.get(char_id, CHARACTERS["yui"])["name"]
-            if backend_mode == "CPU" and has_spaces:
-                gr.Warning("ZeroGPU 额度已用尽或不可用，本次已自动切换为 CPU 推理（耗时较长）！")
-                prefix = "⚠️ ZeroGPU 不可用/额度已满，已自动降级为 CPU 推理 | "
+            if backend_mode == "CPU-Fallback":
+                gr.Warning("ZeroGPU 额度已满或中途中断，已自动通过 CPU 完整重生成，无截断丢字！")
+                prefix = "⚠️ ZeroGPU 中断已自动回退 CPU 完整生成 | "
             else:
                 prefix = f"⚡ 算力后端: {backend_mode} | "
             msg = f"{prefix}🎉 [{c_name}] 合成成功！模型推理: {cost:.2f}s | 总耗时: {total_cost:.2f}s | 音频时长: {dur:.2f}s"
@@ -733,7 +772,7 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
             current_char_state,
             text_input, prompt_radio, lang_select, speed_slider,
             top_k_slider, top_p_slider, temp_slider,
-            custom_audio, custom_text, custom_lang
+            custom_audio, custom_text, custom_lang, use_gpu_checkbox
         ],
         outputs=[audio_output, status_box],
         api_name="predict"
@@ -746,7 +785,8 @@ def health():
         "status": "ok",
         "current_character": CURRENT_LOADED_CHAR,
         "supported_characters": list(CHARACTERS.keys()),
-        "model": "GPT-SoVITS v2Pro"
+        "model": "GPT-SoVITS v2ProPlus (v4)",
+        "default_backend": "CPU",
     }
 
 @demo.app.get("/api/characters")
@@ -770,7 +810,8 @@ def api_tts_get(
     character: str = Query("yui", description="角色代号 (yui/mio/ritsu/tsumugi/azusa/ui/nodoka)"),
     prompt: str = Query("默认", description="语气预设名称"),
     lang: str = Query("auto", description="语言 (ja/zh/en/auto)"),
-    speed: float = Query(1.0, description="语速 (0.6 ~ 1.5)")
+    speed: float = Query(1.0, description="语速 (0.6 ~ 1.5)"),
+    use_gpu: bool = Query(False, description="是否尝试启用 ZeroGPU (默认 False 走纯 CPU 稳定防中断)")
 ):
     char_id = character.lower()
     if char_id not in CHARACTERS:
@@ -780,7 +821,8 @@ def api_tts_get(
         text=text,
         prompt_name=prompt,
         language=lang,
-        speed=speed
+        speed=speed,
+        use_gpu=use_gpu,
     )
     buf = io.BytesIO()
     wav_int16 = (np.clip(audio_data, -1.0, 1.0) * 32767.0).astype(np.int16)
@@ -810,9 +852,10 @@ async def api_tts_post(request: Request):
     prompt = req.get("prompt", "默认")
     lang = req.get("lang", "auto")
     speed = float(req.get("speed", 1.0))
-    top_k = int(req.get("top_k", 15))
-    top_p = float(req.get("top_p", 0.8))
-    temperature = float(req.get("temperature", 0.8))
+    top_k = int(req.get("top_k", 12))
+    top_p = float(req.get("top_p", 0.75))
+    temperature = float(req.get("temperature", 0.75))
+    use_gpu = bool(req.get("use_gpu", False))
 
     sr, audio_data, cost, backend_mode = generate_character_speech(
         char_id=character,
@@ -822,7 +865,8 @@ async def api_tts_post(request: Request):
         speed=speed,
         top_k=top_k,
         top_p=top_p,
-        temperature=temperature
+        temperature=temperature,
+        use_gpu=use_gpu,
     )
     buf = io.BytesIO()
     wav_int16 = (np.clip(audio_data, -1.0, 1.0) * 32767.0).astype(np.int16)

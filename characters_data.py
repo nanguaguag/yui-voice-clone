@@ -50,6 +50,14 @@ CHARACTERS = {
         "has_presets": True,
         "prompts": [
             {
+                "id": "prompt_pure_v4",
+                "name": "纯净原声 (推荐)",
+                "audio_path": "data/tts/slices/yui_00141.wav",
+                "prompt_text": "ふわふわまっしろ生クリーム。あったかマフラー。",
+                "prompt_language": "ja",
+                "desc": "与 v4 模型 100% 同域的 PSP 高保真干音，最纯净自然、电音最少。"
+            },
+            {
                 "id": "prompt_energetic",
                 "name": "元气活力",
                 "audio_path": "data/tts/yui_slices/yui_00065.wav",
@@ -98,9 +106,13 @@ CHARACTERS = {
             "小梓小梓~让我抱一下嘛！就抱五秒钟，吸一口小梓能量！",
             "Hello everyone! Welcome to After School Tea Time! Let's rock!"
         ],
+        "aux_refs": [
+            "data/tts/slices/yui_00073.wav",
+            "data/tts/slices/yui_00088.wav"
+        ],
         "weights": {
-            "sovits": "yui_pure_v3_e10_s200.pth",
-            "gpt": "yui_pure_v3-e15.ckpt"
+            "sovits": "yui_pure_v4_e8_s248.pth",
+            "gpt": "yui_pure_v4-e15.ckpt"
         }
     },
     "mio": {
@@ -139,9 +151,13 @@ CHARACTERS = {
             "不要盯着我看啦……我会紧张得弹错音的！",
             "今天放学后，一定要把那段贝斯独奏好好练熟。"
         ],
+        "aux_refs": [
+            "data/tts/slices/mio_00087.wav",
+            "data/tts/slices/mio_00083.wav"
+        ],
         "weights": {
-            "sovits": "mio_pure_v3_e10_s160.pth",
-            "gpt": "mio_pure_v3-e15.ckpt"
+            "sovits": "mio_pure_v4_e8_s384.pth",
+            "gpt": "mio_pure_v4-e15.ckpt"
         }
     },
     "ritsu": {
@@ -180,9 +196,13 @@ CHARACTERS = {
             "好啦好啦！放学后茶会今天的排练正式开始！",
             "吃完点心再练习嘛，这才叫放学后茶会呀！"
         ],
+        "aux_refs": [
+            "data/tts/slices/ritsu_00132.wav",
+            "data/tts/slices/ritsu_00130.wav"
+        ],
         "weights": {
-            "sovits": "ritsu_pure_v3_e10_s180.pth",
-            "gpt": "ritsu_pure_v3-e15.ckpt"
+            "sovits": "ritsu_pure_v4_e8_s216.pth",
+            "gpt": "ritsu_pure_v4-e15.ckpt"
         }
     },
     "tsumugi": {
@@ -221,9 +241,13 @@ CHARACTERS = {
             "呵呵，今天特地为大家准备了热红茶和草莓蛋糕哦。",
             "能和大家一起在轻音部弹琴喝茶，是我最开心的事情了。"
         ],
+        "aux_refs": [
+            "data/tts/slices/tsumugi_00117.wav",
+            "data/tts/slices/tsumugi_00129.wav"
+        ],
         "weights": {
-            "sovits": "tsumugi_pure_v3_e10_s200.pth",
-            "gpt": "tsumugi_pure_v3-e15.ckpt"
+            "sovits": "tsumugi_pure_v4_e8_s256.pth",
+            "gpt": "tsumugi_pure_v4-e15.ckpt"
         }
     },
     "azusa": {
@@ -262,9 +286,13 @@ CHARACTERS = {
             "唯前辈！不要再抱过来了啦，很热的！",
             "喵……喵呜？！才、才不是什么梓喵呢！"
         ],
+        "aux_refs": [
+            "data/tts/slices/azusa_00123.wav",
+            "data/tts/slices/azusa_00124.wav"
+        ],
         "weights": {
-            "sovits": "azusa_pure_v3_e10_s190.pth",
-            "gpt": "azusa_pure_v3-e15.ckpt"
+            "sovits": "azusa_pure_v4_e8_s256.pth",
+            "gpt": "azusa_pure_v4-e15.ckpt"
         }
     },
     "ui": {
@@ -303,9 +331,13 @@ CHARACTERS = {
             "姐姐！快点起床啦，再赖床要迟到了哦！",
             "今天的早餐做好了姐姐最喜欢的煎蛋卷和味噌汤哦~"
         ],
+        "aux_refs": [
+            "data/tts/slices/ui_00072.wav",
+            "data/tts/slices/ui_00062.wav"
+        ],
         "weights": {
-            "sovits": "ui_pure_v3_e10_s220.pth",
-            "gpt": "ui_pure_v3-e15.ckpt"
+            "sovits": "ui_pure_v4_e8_s312.pth",
+            "gpt": "ui_pure_v4-e15.ckpt"
         }
     },
     "nodoka": {
@@ -344,9 +376,13 @@ CHARACTERS = {
             "唯，学生会要填写的社团表格你又拖到最后一天了哦。",
             "从小到大，唯只要一专注起来，就会展现出不可思议的能量呢。"
         ],
+        "aux_refs": [
+            "data/tts/slices/nodoka_00080.wav",
+            "data/tts/slices/nodoka_00064.wav"
+        ],
         "weights": {
-            "sovits": "nodoka_pure_v3_e10_s230.pth",
-            "gpt": "nodoka_pure_v3-e15.ckpt"
+            "sovits": "nodoka_pure_v4_e8_s280.pth",
+            "gpt": "nodoka_pure_v4-e15.ckpt"
         }
     }
 }
