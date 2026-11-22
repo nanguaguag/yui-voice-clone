@@ -139,10 +139,10 @@ CHARACTERS = {
         "default_prompt": {
             "id": "prompt_default",
             "name": "默认纯净语气",
-            "audio_path": "data/tts/slices/mio_00099.wav",
-            "prompt_text": "なんだかドキドキすることがあるかも。テストがうまくいきそう。",
+            "audio_path": "data/tts/slices/mio_00041.wav",
+            "prompt_text": "いろいろあるな。どれにしよう。迷うな。これなんかどうかな。",
             "prompt_language": "ja",
-            "desc": "澪酱标志性沉稳清润的声线，带着微羞涩与认真的日常语调。"
+            "desc": "澪酱标志性自然对话声线，语调起伏生动柔和，带有微羞涩与日常交流感。"
         },
         "examples": [
             "恥ずかしいから、あまり見ないでよ…！でも、ベースの練習は付き合ってあげる。",
@@ -152,8 +152,8 @@ CHARACTERS = {
             "今天放学后，一定要把那段贝斯独奏好好练熟。"
         ],
         "aux_refs": [
-            "data/tts/slices/mio_00087.wav",
-            "data/tts/slices/mio_00083.wav"
+            "data/tts/slices/mio_00045.wav",
+            "data/tts/slices/mio_00099.wav"
         ],
         "weights": {
             "sovits": "mio_pure_v4_e8_s384.pth",

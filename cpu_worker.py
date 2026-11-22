@@ -76,12 +76,13 @@ def main():
                 prompt_language=req["ref_lang"],
                 text=req["text"],
                 text_language=req["target_lang"],
-                how_to_cut=infer.i18n("凑四句一切"),
+                how_to_cut=infer.i18n("不切"),
                 top_k=int(req["top_k"]),
                 top_p=float(req["top_p"]),
                 temperature=float(req["temperature"]),
                 speed=float(req["speed"]),
                 inp_refs=inp_refs,
+                pause_second=0.22,
             )
             sr, audio_data = next(gen)
             cost = time.time() - t0

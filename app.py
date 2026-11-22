@@ -181,21 +181,58 @@ def _apply_kon_mapping(text: str) -> str:
         text = re.sub(pattern, target, text)
     return text
 
-def clean_and_normalize_text(text: str, language: str = "Multilingual Mixed") -> str:
-    """按语言模式分流校准专有名词：
+def _normalize_punct_and_split_sentences(text: str, max_chars: int = 28) -> str:
+    """归一化省略号/复合标点并按完整单句切分（用 \\n 隔开，配合 how_to_cut='不切'）：
+    - 彻底消除 '…！' / '…って' / '！？' 等未登录或稀疏标点组合引发的 GPT 60s 静音死循环；
+    - 每句控制在 10~28 字（匹配 3~5s 训练切片分布），既保持句内连贯情感又杜绝长段落注意力丢失。
+    """
+    t = text.strip()
+    # 1. 归一化复合标点与省略号（避免孤立 '…' 紧接促音 'って' 导致 AR 失焦）
+    t = re.sub(r"[…\.]{1,}[！!]+", "！", t)
+    t = re.sub(r"[…\.]{1,}[？?]+", "？", t)
+    t = re.sub(r"[！？?!]{2,}", "！", t)
+    t = re.sub(r"[…]{1,}", "、", t)
+    t = re.sub(r"\.{2,}", "、", t)
+    t = re.sub(r"[、，,]{2,}", "、", t)
+
+    # 2. 按句末标点与换行切分为自然单句
+    raw_sents = [s.strip() for s in re.split(r"(?<=[。！？!?])\s*|\n+", t) if s.strip()]
+    final_lines = []
+    for sent in raw_sents:
+        if len(sent) <= max_chars:
+            final_lines.append(sent)
+            continue
+        # 仅当单句过长 (>28字) 时，在最靠近中点的逗号处温柔切一刀，避免过度碎切
+        comma_positions = [m.end() for m in re.finditer(r"[、，,]", sent)]
+        if comma_positions:
+            mid = len(sent) / 2.0
+            best_pos = min(comma_positions, key=lambda pos: abs(pos - mid))
+            left, right = sent[:best_pos].strip(), sent[best_pos:].strip()
+            if len(left) >= 5 and len(right) >= 5:
+                final_lines.append(left)
+                final_lines.append(right)
+                continue
+        final_lines.append(sent)
+    return "\n".join(final_lines)
+
+
+def clean_and_normalize_text(text: str, language: str = "Multilingual Mixed", split_sentences: bool = True) -> str:
+    """按语言模式分流校准专有名词，并按单句切分防 AR 长句死循环：
     - Japanese: 全文应用 K-ON 日语专有名词映射表
     - Multilingual Mixed: 仅对 [JA]...[/JA] 或 [JA]...[JA] 标签内文本应用映射表
     - Chinese / English: 原样保留，不做替换
     """
     text = text.strip()
     if language == "Japanese":
-        return _apply_kon_mapping(text)
+        text = _apply_kon_mapping(text)
     elif language == "Multilingual Mixed":
-        return re.sub(
+        text = re.sub(
             r"(\[JA\])(.*?)(\[/?JA\])",
             lambda m: f"{m.group(1)}{_apply_kon_mapping(m.group(2))}{m.group(3)}",
             text
         )
+    if split_sentences and text:
+        text = _normalize_punct_and_split_sentences(text)
     return text
 
 def enhance_voice_clarity(audio_data: np.ndarray, sr: int) -> np.ndarray:
@@ -290,7 +327,7 @@ def _resolve_prompt_and_text(
     if custom_ref_wav and os.path.exists(custom_ref_wav) and custom_prompt_text:
         ref_wav = custom_ref_wav
         ref_lang = LANGUAGE_MAP.get(custom_prompt_lang, "Japanese")
-        ref_text = clean_and_normalize_text(custom_prompt_text, language=ref_lang)
+        ref_text = clean_and_normalize_text(custom_prompt_text, language=ref_lang, split_sentences=False)
     elif char_info["has_presets"]:
         matched = next((p for p in char_info["prompts"] if p["name"] == prompt_name), char_info["prompts"][0])
         ref_wav = os.path.join(APP_DIR, matched["audio_path"])
@@ -426,9 +463,9 @@ def _generate_character_speech_impl(
     prompt_name: str = "默认",
     language: str = "auto",
     speed: float = 1.0,
-    top_k: int = 12,
-    top_p: float = 0.75,
-    temperature: float = 0.75,
+    top_k: int = 15,
+    top_p: float = 0.85,
+    temperature: float = 0.90,
     custom_ref_wav: str = None,
     custom_prompt_text: str = None,
     custom_prompt_lang: str = None
@@ -454,12 +491,13 @@ def _generate_character_speech_impl(
         prompt_language=ref_lang,
         text=norm_text,
         text_language=target_lang,
-        how_to_cut=infer.i18n("凑四句一切"),
+        how_to_cut=infer.i18n("不切"),
         top_k=top_k,
         top_p=top_p,
         temperature=temperature,
         speed=speed,
         inp_refs=inp_refs,
+        pause_second=0.22,
     )
     sr, audio_data = next(gen)
     infer_cost = time.time() - t_start
@@ -474,9 +512,9 @@ def _generate_character_speech_gpu(
     prompt_name: str = "默认",
     language: str = "auto",
     speed: float = 1.0,
-    top_k: int = 12,
-    top_p: float = 0.75,
-    temperature: float = 0.75,
+    top_k: int = 15,
+    top_p: float = 0.85,
+    temperature: float = 0.90,
     custom_ref_wav: str = None,
     custom_prompt_text: str = None,
     custom_prompt_lang: str = None
@@ -502,9 +540,9 @@ def generate_character_speech(
     prompt_name: str = "默认",
     language: str = "auto",
     speed: float = 1.0,
-    top_k: int = 12,
-    top_p: float = 0.75,
-    temperature: float = 0.75,
+    top_k: int = 15,
+    top_p: float = 0.85,
+    temperature: float = 0.90,
     custom_ref_wav: str = None,
     custom_prompt_text: str = None,
     custom_prompt_lang: str = None,
@@ -664,9 +702,9 @@ with gr.Blocks(title="K-ON! 放学后茶会全员声音克隆", css=BASE_CSS) as
 
             with gr.Accordion("⚙️ 高级模型参数 (可选)", open=False):
                 with gr.Row():
-                    top_k_slider = gr.Slider(minimum=1, maximum=30, value=12, step=1, label="Top-K")
-                    top_p_slider = gr.Slider(minimum=0.1, maximum=1.0, value=0.75, step=0.05, label="Top-P")
-                    temp_slider = gr.Slider(minimum=0.1, maximum=1.5, value=0.75, step=0.05, label="Temperature")
+                    top_k_slider = gr.Slider(minimum=1, maximum=30, value=15, step=1, label="Top-K")
+                    top_p_slider = gr.Slider(minimum=0.1, maximum=1.0, value=0.85, step=0.05, label="Top-P")
+                    temp_slider = gr.Slider(minimum=0.1, maximum=1.5, value=0.90, step=0.05, label="Temperature")
                 use_gpu_checkbox = gr.Checkbox(
                     label="⚡ 启用 ZeroGPU 加速 (默认关闭：纯 CPU 仅需数秒且永不因额度中断；若 GPU 中断将自动完整回退 CPU)",
                     value=False
@@ -852,9 +890,9 @@ async def api_tts_post(request: Request):
     prompt = req.get("prompt", "默认")
     lang = req.get("lang", "auto")
     speed = float(req.get("speed", 1.0))
-    top_k = int(req.get("top_k", 12))
-    top_p = float(req.get("top_p", 0.75))
-    temperature = float(req.get("temperature", 0.75))
+    top_k = int(req.get("top_k", 15))
+    top_p = float(req.get("top_p", 0.85))
+    temperature = float(req.get("temperature", 0.90))
     use_gpu = bool(req.get("use_gpu", False))
 
     sr, audio_data, cost, backend_mode = generate_character_speech(
